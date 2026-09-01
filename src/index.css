@@ -1,0 +1,208 @@
+@import "tailwindcss";
+
+@theme {
+  /* ==========================================================================
+     GEOMETRIC BALANCE DESIGN SYSTEM: Custom Geometry-Inspired Spacing Scales
+     ========================================================================== */
+  --spacing-geo-1: 0.25rem;   /* 4px  - baseline grid unit */
+  --spacing-geo-2: 0.5rem;    /* 8px  - micro structural module */
+  --spacing-geo-3: 0.75rem;   /* 12px - optical gutter */
+  --spacing-geo-4: 1rem;      /* 16px - base component interior padding */
+  --spacing-geo-5: 1.25rem;   /* 20px - intermediate cadence unit */
+  --spacing-geo-6: 1.5rem;    /* 24px - standard card/section padding */
+  --spacing-geo-8: 2rem;      /* 32px - major grid column gap */
+  --spacing-geo-10: 2.5rem;   /* 40px - architectural vertical rhythm */
+  --spacing-geo-12: 3rem;     /* 48px - block separator */
+  --spacing-geo-16: 4rem;     /* 64px - macro quadrant space */
+  --spacing-geo-20: 5rem;     /* 80px - hero section vertical rhythm */
+  --spacing-geo-24: 6rem;     /* 96px - view header boundary */
+
+  /* Mathematical Golden Ratio Scale Units */
+  --spacing-golden-1: 0.382rem;  /* 6.1px */
+  --spacing-golden-2: 0.618rem;  /* 9.9px */
+  --spacing-golden-3: 1rem;      /* 16px */
+  --spacing-golden-4: 1.618rem;  /* 25.9px */
+  --spacing-golden-5: 2.618rem;  /* 41.9px */
+  --spacing-golden-6: 4.236rem;  /* 67.8px */
+
+  /* ==========================================================================
+     GEOMETRIC BALANCE: Refined Sharp-Corner Border Radii (Architectural Precision)
+     ========================================================================== */
+  --radius-none: 0px;
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
+  --radius-2xl: 8px;
+  --radius-3xl: 8px;
+  --radius-sharp: 2px;
+  --radius-box: 3px;
+
+  /* ==========================================================================
+     GEOMETRIC BALANCE: Precision Engineering Color System
+     ========================================================================== */
+  --color-brand-navy: #0A192F;
+  --color-brand-navy-dark: #050D1A;
+  --color-brand-navy-light: #112240;
+  --color-brand-red: #CC0000;
+  --color-brand-red-dark: #990000;
+  --color-brand-red-light: #E60000;
+}
+
+/* ==========================================================================
+   GEOMETRIC BALANCE: Rigid Grid & Layout System
+   ========================================================================== */
+@layer utilities {
+  /* Architectural Blueprint Subtle Grid Background */
+  .geo-blueprint-grid {
+    background-image: linear-gradient(to right, rgba(10, 25, 47, 0.04) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(10, 25, 47, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .geo-blueprint-grid-dark {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Rigid Card Containers with Sharp Corners and 1px Precision Borders */
+  .geo-card {
+    border-radius: var(--radius-sm, 2px);
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04);
+  }
+
+  .geo-card-navy {
+    border-radius: var(--radius-sm, 2px);
+    border: 1px solid #1e293b;
+    background-color: #0A192F;
+    color: #ffffff;
+  }
+
+  /* Rigid Dashboard Metric Tile */
+  .geo-metric-card {
+    border-radius: var(--radius-sm, 2px);
+    border-top: 3px solid #0A192F;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    padding: 1.25rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+  }
+
+  .geo-metric-card-red {
+    border-radius: var(--radius-sm, 2px);
+    border-top: 3px solid #CC0000;
+    border-right: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    border-left: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    padding: 1.25rem;
+  }
+
+  /* Rigid Multi-Column Metric Grids */
+  .geo-grid-dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  /* Sharp Action Buttons with Strict 2:1 Horizontal to Vertical Padding */
+  .geo-btn-primary {
+    border-radius: var(--radius-xs, 2px);
+    padding: 0.625rem 1.25rem;
+    background-color: #0A192F;
+    color: #ffffff;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+  }
+
+  .geo-btn-primary:hover {
+    background-color: #112240;
+  }
+
+  .geo-btn-danger {
+    border-radius: var(--radius-xs, 2px);
+    padding: 0.625rem 1.25rem;
+    background-color: #CC0000;
+    color: #ffffff;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+  }
+
+  .geo-btn-danger:hover {
+    background-color: #990000;
+  }
+
+  .geo-btn-secondary {
+    border-radius: var(--radius-xs, 2px);
+    padding: 0.625rem 1.25rem;
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    color: #1e293b;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+  }
+
+  .geo-btn-secondary:hover {
+    background-color: #e2e8f0;
+  }
+
+  /* Sharp Form Inputs with Geometric Focus Boundaries */
+  .geo-input {
+    border-radius: var(--radius-xs, 2px);
+    border: 1px solid #cbd5e1;
+    background-color: #ffffff;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    color: #0f172a;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+  }
+
+  .geo-input:focus {
+    outline: none;
+    border-color: #0A192F;
+    box-shadow: 0 0 0 1px #0A192F;
+  }
+
+  /* Precise Architectural Bi-Color Accent Rule */
+  .geo-rule-divider {
+    display: flex;
+    width: 100%;
+    height: 3px;
+    background: transparent;
+  }
+}
+
