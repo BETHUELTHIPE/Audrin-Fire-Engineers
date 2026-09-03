@@ -32,6 +32,8 @@ import {
   ALL_PERMITTED_EXTENSIONS,
   getFileTypeMeta,
   checkFileSecurity,
+  validateUploadDocument,
+  DocumentValidationResult,
   formatFileSize
 } from '../utils/fileTypes';
 import { DocumentUploadInput } from '../services/documentSecurityEngine';
@@ -58,6 +60,7 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
 
   // Form State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [validationResult, setValidationResult] = useState<DocumentValidationResult | null>(null);
   const [fileSecurityWarning, setFileSecurityWarning] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -86,9 +89,14 @@ export const DocumentUploadModal: React.FC<DocumentUploadModalProps> = ({
   const fileMeta = selectedFile ? getFileTypeMeta(selectedFile.name, selectedFile.type) : null;
 
   const handleFileSelection = (file: File) => {
-    const secCheck = checkFileSecurity(file.name, file.type);
-    if (secCheck.isProhibited) {
-      setFileSecurityWarning(secCheck.reason || 'Prohibited file type detected.');
+    const val = validateUploadDocument(file, {
+      maxSizeMb: 100,
+      strictDenyByDefault: true
+    });
+    setValidationResult(val);
+
+    if (!val.isValid) {
+      setFileSecurityWarning(val.error || 'Upload validation failed.');
       setSelectedFile(file);
       return;
     }

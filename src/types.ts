@@ -1051,3 +1051,854 @@ export interface DocumentSystemMetrics {
   revisionsActiveCount: number;
 }
 
+// -------------------------------------------------------------
+// SANS 10139 COMPLIANCE CALENDAR & INSPECTION SCHEDULING TYPES
+// -------------------------------------------------------------
+
+export type SANS10139InspectionType =
+  | 'weekly_user_test'
+  | 'quarterly_periodic_inspection'
+  | 'biannual_inspection'
+  | 'annual_comprehensive_servicing'
+  | 'site_survey'
+  | 'commissioning_verification'
+  | 'emergency_fault_attendance';
+
+export type InspectionStatus =
+  | 'scheduled'
+  | 'due_soon'
+  | 'overdue'
+  | 'completed'
+  | 'in_progress'
+  | 'rescheduled';
+
+export interface TechnicianProfile {
+  id: string;
+  name: string;
+  role: string;
+  saqccNumber: string;
+  saqccLevel: 'Level 1 - Cabler' | 'Level 2 - Installer' | 'Level 3 - Servicing / Commissioner' | 'Level 4 - Designer / Master';
+  phone: string;
+  email: string;
+  specialties: string[];
+  currentAssignedCount: number;
+  baseLocation: string;
+  avatarColor: string;
+}
+
+export interface ComplianceInspection {
+  id: string;
+  title: string;
+  inspectionType: SANS10139InspectionType;
+  standardClause: string; // e.g. "SANS 10139:2012 Clause 25.3"
+  siteId: string;
+  siteName: string;
+  organisationId: string;
+  organisationName: string;
+  streetAddress: string;
+  city: string;
+  serviceRequestId?: string;
+  serviceRequestRef?: string;
+  systemCategory: string; // "Category L1", "Category L2", "Category M", "Category P1"
+  panelMakeModel: string;
+  zonesOrLoopsCount?: string;
+  scheduledDate: string; // "YYYY-MM-DD"
+  scheduledTimeWindow: string; // "09:00 - 12:00"
+  assignedTechnicianId: string;
+  assignedTechnicianName: string;
+  technicianSaqccNumber: string;
+  technicianPhone: string;
+  status: InspectionStatus;
+  complianceChecklistSummary: string[];
+  estimatedDurationHours: number;
+  notes?: string;
+  completionDate?: string;
+  findingsSummary?: string;
+  certificateIssued?: boolean;
+  certificateNumber?: string;
+  createdAt: string;
+}
+
+export interface SuggestedTimeSlot {
+  id: string;
+  date: string; // "YYYY-MM-DD"
+  timeWindow: string; // "09:00 - 12:00" or "13:30 - 16:30"
+  technician: TechnicianProfile;
+  suitabilityScore: number; // e.g. 98
+  reasons: string[];
+  travelZone: string;
+  conflictRisk: 'none' | 'low';
+}
+
+export interface CalendarFilterState {
+  searchQuery: string;
+  selectedSite: string; // 'all' or siteId/siteName
+  selectedType: string; // 'all' or SANS10139InspectionType
+  selectedStatus: string; // 'all' or InspectionStatus
+  selectedTechnician: string; // 'all' or technicianId
+}
+
+// -------------------------------------------------------------
+// SOUTH AFRICAN STATUTORY FORMS & CLIENT COMPLIANCE ENGINE TYPES
+// (SANS 10139, SANS 322, SANS 246, SANS 10400-T)
+// -------------------------------------------------------------
+
+export type StatutoryStandardCode = 
+  | 'SANS_10139' 
+  | 'SANS_322' 
+  | 'SANS_246' 
+  | 'SANS_10400_T';
+
+export type StatutoryFormCategory =
+  | 'routine_maintenance'
+  | 'false_alarm_management'
+  | 'handover_commissioning'
+  | 'healthcare_specification'
+  | 'healthcare_evacuation'
+  | 'server_room_risk'
+  | 'server_room_asd'
+  | 'server_room_disaster'
+  | 'building_reg_appointment'
+  | 'equipment_allocation'
+  | 'escape_compliance';
+
+export type StatutorySubmissionStatus =
+  | 'draft'
+  | 'submitted'
+  | 'verified_by_engineer'
+  | 'approved'
+  | 'requires_rectification';
+
+export interface StatutoryFormFieldOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+export interface StatutoryFormField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'select' | 'textarea' | 'checkbox' | 'date' | 'radio' | 'heading';
+  required?: boolean;
+  placeholder?: string;
+  defaultValue?: any;
+  options?: StatutoryFormFieldOption[];
+  helpText?: string;
+  standardClause?: string;
+  unit?: string;
+}
+
+export interface StatutoryFormSection {
+  title: string;
+  description?: string;
+  fields: StatutoryFormField[];
+}
+
+export interface StatutoryFormTemplate {
+  id: string;
+  formNumber: string; // e.g. "SANS 10139 - Form 1"
+  title: string;
+  standardCode: StatutoryStandardCode;
+  standardTitle: string;
+  standardClauseRef: string;
+  category: StatutoryFormCategory;
+  description: string;
+  statutoryMandate: string; // Statutory legal context (e.g. "Mandatory under OHS Act & SANS 10139 Clause 25.2")
+  frequency?: string; // "Weekly", "Quarterly", "Annual", "Per Incident", "Once-off"
+  targetAudience: 'Responsible Person (Client)' | 'Building Owner' | 'Hospital Facility Manager' | 'IT / Data Center Manager' | 'Fire Engineer';
+  estimatedMinutesToComplete: number;
+  badgeColor: string;
+  sections: StatutoryFormSection[];
+}
+
+export interface StatutoryFormSubmission {
+  id: string;
+  formTemplateId: string;
+  formNumber: string;
+  formTitle: string;
+  standardCode: StatutoryStandardCode;
+  standardClauseRef: string;
+  category: StatutoryFormCategory;
+  serviceRequestId?: string;
+  serviceRequestRef?: string;
+  siteId: string;
+  siteName: string;
+  organisationName: string;
+  submittedBy: {
+    name: string;
+    email: string;
+    role: string;
+    phone?: string;
+    designation: string; // e.g. "Responsible Person", "Facility Manager", "Pr.Eng"
+  };
+  values: Record<string, any>;
+  status: StatutorySubmissionStatus;
+  certificateNumber?: string;
+  submissionDate: string; // ISO String
+  lastUpdated: string;
+  signedAt?: string;
+  signatureName?: string;
+  reviewedByEngineer?: {
+    name: string;
+    saqccNumber: string;
+    ecsaNumber?: string;
+    comments?: string;
+    reviewDate: string;
+    status: 'compliant' | 'minor_defects_noted' | 'non_compliant';
+  };
+  attachments?: string[];
+}
+
+// -------------------------------------------------------------
+// CERTIFICATE OF COMPLIANCE (COC) APPROVAL WORKFLOW TYPES
+// SANS 10139 / SANS 10400-T / SANS 246 / SANS 322 Compliance
+// -------------------------------------------------------------
+
+export type COCWorkflowStageId =
+  | 'stage_1_inspection'
+  | 'stage_2_defects_clearance'
+  | 'stage_3_engineer_review'
+  | 'stage_4_client_signature'
+  | 'stage_5_coc_issuance';
+
+export type COCWorkflowStageStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'action_required'
+  | 'completed'
+  | 'rejected'
+  | 'waived';
+
+export type COCOverallStatus =
+  | 'inspection_pending'
+  | 'technician_signed'
+  | 'engineer_review'
+  | 'awaiting_client_signature'
+  | 'fully_certified'
+  | 'rectification_required';
+
+export interface COCChecklistItem {
+  id: string;
+  label: string;
+  standardClause: string;
+  passed: boolean;
+  notes?: string;
+  testedAt?: string;
+  testedBy?: string;
+}
+
+export interface COCTechnicianSignOff {
+  technicianName: string;
+  saqccNumber: string;
+  saqccLevel: string;
+  phone: string;
+  signedAt: string;
+  digitalSignatureUrl?: string;
+  verificationHash: string;
+  panelMakeModel: string;
+  loopSensorsTestedCount: number;
+  sounderAudibilityDba: number;
+  standbyBatteryVoltage: number;
+  batteryLoadTestPassed: boolean;
+  notes?: string;
+}
+
+export interface COCEngineerReview {
+  engineerName: string;
+  role: string;
+  ecsaNumber: string;
+  saqccNumber: string;
+  digitalSealId: string;
+  reviewedAt: string;
+  decision: 'approved' | 'rectification_required';
+  systemCategory: string; // e.g. "Category L1", "Category L2", "Category M"
+  standardReference: string; // e.g. "SANS 10139:2012 / SANS 10400-T"
+  endorsementNotes: string;
+  verificationHash: string;
+}
+
+export interface COCClientDigitalSignature {
+  signatoryName: string;
+  signatoryEmail: string;
+  signatoryRole: string; // e.g. "Responsible Person (SANS 10139)", "Building Owner / Facility Manager"
+  organisationName: string;
+  signatureType: 'canvas_drawn' | 'crypto_seal';
+  signatureDataUrl: string;
+  signedAt: string;
+  ipAddress: string;
+  browserFingerprint: string;
+  statutoryDeclarationAccepted: boolean;
+  declarationText: string;
+}
+
+export interface COCWorkflowStage {
+  id: COCWorkflowStageId;
+  stageNumber: number;
+  title: string;
+  shortLabel: string;
+  description: string;
+  requiredRole: 'Technician (SAQCC)' | 'Remediation Lead' | 'Lead Fire Systems Engineer (Pr.Eng)' | 'Client Responsible Person' | 'Compliance Registrar';
+  status: COCWorkflowStageStatus;
+  completedAt?: string;
+  updatedAt?: string;
+  checklist?: COCChecklistItem[];
+  technicianSignOff?: COCTechnicianSignOff;
+  engineerReview?: COCEngineerReview;
+  clientSignature?: COCClientDigitalSignature;
+  defectsSummary?: {
+    totalLogged: number;
+    rectified: number;
+    criticalRemaining: number;
+    clearanceNotes?: string;
+  };
+  notes?: string;
+}
+
+export interface COCApprovalWorkflow {
+  id: string;
+  certificateNumber: string; // e.g. "COC-SANS10139-2026-0891-A"
+  serviceRequestId: string;
+  serviceRequestRef: string;
+  siteId: string;
+  siteName: string;
+  buildingAddress: string;
+  city: string;
+  province: string;
+  organisationName: string;
+  systemCategory: string; // "Category L1 (Life Safety)", "Category L2", "Category M", "Category P1"
+  standardReference: string; // "SANS 10139:2012 / SANS 10400-T"
+  overallStatus: COCOverallStatus;
+  progressPercentage: number; // 0 to 100
+  currentStageId: COCWorkflowStageId;
+  createdAt: string;
+  lastUpdated: string;
+  issuedAt?: string;
+  validUntil?: string; // e.g. 1 year from issuedAt
+  qrVerificationCode: string;
+  qrVerificationUrl: string;
+  stages: COCWorkflowStage[];
+  dispatchedRecipients?: {
+    name: string;
+    entity: string; // e.g. "City of Joburg Fire Department", "Santam Commercial Underwriting", "Client Archive"
+    email: string;
+    dispatchedAt: string;
+    method: 'Automated Webhook' | 'Encrypted PDF Dispatch';
+  }[];
+}
+
+// -------------------------------------------------------------
+// BROWSER PUSH NOTIFICATION & BACKGROUND ALERT ENGINE TYPES
+// SANS 10139 Urgent SLA & Maintenance Deadlines
+// -------------------------------------------------------------
+
+export type PushNotificationType =
+  | 'urgent_dispatch'
+  | 'maintenance_deadline'
+  | 'coc_action'
+  | 'sans_lifecycle'
+  | 'report_ready'
+  | 'video_review'
+  | 'system_alert'
+  | 'general';
+
+export type PushNotificationSeverity = 'critical' | 'high' | 'medium' | 'info';
+
+export type NotificationTargetRole = 'all' | 'technician' | 'client' | 'admin';
+
+export interface PushNotificationActionPayload {
+  action: string;
+  title: string;
+  icon?: string;
+}
+
+export interface PushNotificationItem {
+  id: string; // UUID
+  title: string;
+  body: string;
+  type: PushNotificationType;
+  severity: PushNotificationSeverity;
+  targetRole: NotificationTargetRole;
+  timestamp: string; // ISO String
+  isRead: boolean;
+  siteName?: string;
+  serviceRequestId?: string;
+  serviceRequestRef?: string;
+  inspectionId?: string;
+  cocWorkflowId?: string;
+  standardClause?: string; // e.g. "SANS 10139:2012 Clause 25.3"
+  slaDeadline?: string; // e.g. "2h Emergency Response" or "2026-09-03 14:00"
+  technicianName?: string;
+  technicianSaqcc?: string;
+  actionUrl?: string;
+  actionLabel?: string;
+  actions?: PushNotificationActionPayload[];
+  isDeliveredViaSW: boolean;
+  audioChimePlayed: boolean;
+}
+
+export interface PushNotificationPreferences {
+  enabled: boolean;
+  soundEnabled: boolean;
+  vibrateEnabled: boolean;
+  urgentDispatches: boolean; // SANS 10139 Emergency Faults & SLA Dispatches
+  maintenanceDeadlines: boolean; // 24h & 7d Quarterly Periodic Tests (Clause 25.3)
+  cocSignatures: boolean; // Digital CoC Sign-offs (Responsible Person & Pr.Eng)
+  sansLifecycleAlerts: boolean; // 5-Year Battery & Detector Recalibrations
+  reportAndEvidenceAlerts: boolean; // Pre/Post-Work Condition Reports
+  backgroundPollingIntervalMinutes: number; // 0.5 (30s), 1, 5, 15
+  userRoleScope: NotificationTargetRole;
+  desktopStickyBanner: boolean;
+}
+
+export interface PushNotificationSimulationScenario {
+  id: string;
+  label: string;
+  category: 'technician' | 'client' | 'admin' | 'statutory';
+  title: string;
+  body: string;
+  type: PushNotificationType;
+  severity: PushNotificationSeverity;
+  targetRole: NotificationTargetRole;
+  siteName: string;
+  serviceRequestRef?: string;
+  standardClause?: string;
+  slaDeadline?: string;
+  technicianName?: string;
+  actionLabel: string;
+  actionView: string;
+}
+
+// AWS ECS Fargate & Infrastructure Types
+export interface AwsEcsServiceStatus {
+  id: string;
+  name: string;
+  serviceName: string;
+  taskDefinition: string;
+  launchType: 'FARGATE' | 'FARGATE_SPOT';
+  desiredCount: number;
+  runningCount: number;
+  pendingCount: number;
+  cpu: number; // in vCPU or units (e.g. 256, 512, 1024)
+  memory: number; // in MB (e.g. 512, 1024, 2048, 4096)
+  cpuUtilization: number; // percentage
+  memoryUtilization: number; // percentage
+  status: 'ACTIVE' | 'DRAINING' | 'INACTIVE' | 'DEPLOYING';
+  healthStatus: 'HEALTHY' | 'UNHEALTHY' | 'INITIALIZING';
+  isSingleton?: boolean; // For Celery Beat (strictly 1 instance)
+  lastDeploymentAt: string;
+  logGroup: string;
+  roleArn: string;
+}
+
+// Amazon S3 Bucket & Storage Types
+export type S3BucketType = 'static_assets' | 'private_media' | 'quarantine';
+export type S3StorageClass = 'STANDARD' | 'INTELLIGENT_TIERING' | 'GLACIER_FLEXIBLE' | 'DEEP_ARCHIVE';
+export type S3MalwareStatus = 'clean' | 'scanning' | 'quarantined' | 'suspicious' | 'rejected';
+
+export interface S3BucketConfig {
+  bucketName: string;
+  type: S3BucketType;
+  region: string;
+  encryption: 'SSE-KMS' | 'AES256';
+  kmsKeyArn: string;
+  blockPublicAccess: boolean;
+  versioningEnabled: boolean;
+  objectCount: number;
+  totalSizeBytes: number;
+  cloudFrontDistributionId?: string;
+  cloudFrontDomain?: string;
+  lifecycleRules: {
+    id: string;
+    description: string;
+    transitionDays?: number;
+    targetStorageClass?: S3StorageClass;
+    expirationDays?: number;
+    abortIncompleteMultipartDays?: number;
+  }[];
+}
+
+export interface S3StoredObject {
+  id: string;
+  key: string;
+  bucketName: string;
+  sizeBytes: number;
+  lastModified: string;
+  contentType: string;
+  storageClass: S3StorageClass;
+  encryption: 'aws:kms' | 'AES256';
+  kmsKeyId?: string;
+  etag: string;
+  sha256Checksum?: string;
+  malwareStatus: S3MalwareStatus;
+  category: 
+    | 'photo_before'
+    | 'photo_during'
+    | 'photo_after'
+    | 'video_original'
+    | 'video_processed'
+    | 'video_thumbnail'
+    | 'cad_drawing'
+    | 'report_pre_work'
+    | 'report_post_work'
+    | 'report_service'
+    | 'document_technical'
+    | 'static_asset'
+    | 'voice_guide';
+  organisationUuid: string;
+  siteUuid?: string;
+  requestUuid?: string;
+  fileUuid: string;
+  presignedUrl?: string;
+  presignedExpiresAt?: string;
+  isArchived: boolean;
+  accessLogCount: number;
+}
+
+// Amazon SNS / SQS / SES Notification System Types
+export type SnsEventType =
+  | 'client.registered'
+  | 'email.verification'
+  | 'password.reset'
+  | 'contact.enquiry'
+  | 'request.submitted'
+  | 'survey.requested'
+  | 'fault.reported'
+  | 'emergency.fault'
+  | 'documents.uploaded'
+  | 'images.uploaded'
+  | 'videos.uploaded'
+  | 'evidence.processed'
+  | 'evidence.rejected'
+  | 'evidence.missing'
+  | 'report.pre_work_generated'
+  | 'report.post_work_generated'
+  | 'site_visit.scheduled'
+  | 'request.status_changed'
+  | 'quotation.available'
+  | 'work.scheduled'
+  | 'work.completed'
+  | 'report.updated'
+  | 'report.acknowledged'
+  | 'celery.task_failed'
+  | 'ecs.service_alarm'
+  | 'malware.detected';
+
+export type SnsDeliveryStatus = 
+  | 'pending'
+  | 'published_to_sns'
+  | 'queued_in_sqs'
+  | 'processing'
+  | 'sent_ses'
+  | 'delivered'
+  | 'bounced'
+  | 'complained'
+  | 'suppressed'
+  | 'dead_lettered';
+
+export interface SnsNotificationEvent {
+  id: string;
+  eventId: string;
+  eventType: SnsEventType;
+  topicArn: string;
+  topicName: string;
+  timestamp: string;
+  organisationUuid: string;
+  userUuid?: string;
+  recipientEmail: string;
+  recipientName: string;
+  serviceRequestUuid?: string;
+  serviceRequestRef?: string;
+  reportUuid?: string;
+  templateKey: string;
+  urgency: 'critical' | 'high' | 'normal' | 'low';
+  correlationId: string;
+  idempotencyKey: string;
+  status: SnsDeliveryStatus;
+  attemptsCount: number;
+  snsMessageId?: string;
+  sqsMessageId?: string;
+  sesMessageId?: string;
+  errorMessage?: string;
+  deliveredAt?: string;
+  bounceType?: string;
+}
+
+export interface SqsQueueStatus {
+  queueName: string;
+  queueUrl: string;
+  topicSubscriptionArn: string;
+  approximateNumberOfMessages: number;
+  approximateNumberOfMessagesNotVisible: number;
+  deadLetterQueueName: string;
+  deadLetterMessageCount: number;
+  encryption: 'AWS_KMS' | 'SQS_MANAGED';
+  visibilityTimeoutSeconds: number;
+  messageRetentionPeriodDays: number;
+}
+
+export interface SesConfiguration {
+  verifiedDomain: string;
+  spfRecord: string;
+  dkimStatus: 'VERIFIED' | 'PENDING' | 'FAILED';
+  dmarcPolicy: 'v=DMARC1; p=reject; rua=mailto:dmarc@audrinfire.co.za';
+  dailySendingQuota: number;
+  sentLast24Hours: number;
+  bounceRatePercent: number;
+  complaintRatePercent: number;
+  suppressionListCount: number;
+}
+
+// ==========================================
+// GOOGLE CALENDAR & ZOOM PMI INTEGRATION TYPES
+// ==========================================
+
+export type AppointmentType =
+  | 'initial_consultation'
+  | 'site_survey_planning'
+  | 'remote_system_review'
+  | 'fault_consultation'
+  | 'design_review'
+  | 'quotation_discussion'
+  | 'work_progress'
+  | 'testing_commissioning_review'
+  | 'pre_work_report_review'
+  | 'post_work_report_presentation'
+  | 'handover_meeting'
+  | 'maintenance_planning'
+  | 'other_fire_detection';
+
+export type AppointmentStatus =
+  | 'requested'
+  | 'approved'
+  | 'confirmed'
+  | 'in_progress'
+  | 'completed'
+  | 'rescheduled'
+  | 'cancelled'
+  | 'no_show';
+
+export type GoogleCalendarSyncStatus =
+  | 'pending'
+  | 'synced'
+  | 'sync_failed'
+  | 'conflict_detected'
+  | 'deleted_remotely'
+  | 'channel_renewed';
+
+export type ZoomMeetingStatus =
+  | 'ready'
+  | 'active'
+  | 'locked'
+  | 'completed'
+  | 'waiting_room_active';
+
+export interface AppointmentAttendee {
+  id: string;
+  appointmentId: string;
+  userId?: string;
+  name: string;
+  email: string;
+  role: 'client' | 'staff' | 'admin' | 'observer';
+  rsvpStatus: 'needsAction' | 'accepted' | 'tentative' | 'declined';
+  isRequired: boolean;
+  isHost: boolean;
+  attended?: boolean;
+  joinedAt?: string;
+  leftAt?: string;
+}
+
+export interface AssignedFollowUpAction {
+  id: string;
+  description: string;
+  responsiblePerson: string;
+  responsiblePersonEmail?: string;
+  dueDate: string;
+  priority: 'low' | 'medium' | 'high' | 'critical';
+  status: 'pending' | 'in_progress' | 'completed';
+  sans10139Category?: string;
+}
+
+export interface MeetingOutcome {
+  id: string;
+  appointmentId: string;
+  serviceRequestId?: string;
+  serviceRequestRef?: string;
+  siteId?: string;
+  siteName?: string;
+  clientId?: string;
+  organisationId?: string;
+  recordedByUserId: string;
+  recordedByName: string;
+  recordedAt: string;
+  actualStartTime: string;
+  actualEndTime: string;
+  discussionSummary: string;
+  clientRequirements: string[];
+  documentsRequested: string[];
+  decisionsMade: string[];
+  nextWorkflowStep: string;
+  assignedAction: string;
+  assignedFollowUpActions?: AssignedFollowUpAction[];
+  responsiblePerson: string;
+  dueDate: string;
+  followUpAppointmentRequired: boolean;
+  followUpDate?: string;
+  presentationVersionUsed?: string;
+  statutoryComplianceDisclaimer: string;
+  
+  // PostgreSQL Database Linkage Metadata
+  postgresRecordId?: string;
+  postgresTableName?: string;
+  syncedToPostgresAt?: string;
+  postgresForeignKeyLinks?: {
+    appointmentId: string;
+    serviceRequestId: string;
+    clientId: string;
+    recordedByUserId: string;
+  };
+}
+
+export interface Appointment {
+  id: string;
+  title: string;
+  appointmentType: AppointmentType;
+  status: AppointmentStatus;
+  serviceRequestId: string;
+  serviceRequestRef: string;
+  organisationId: string;
+  organisationName: string;
+  siteId: string;
+  siteName: string;
+  scheduledStart: string;
+  scheduledEnd: string;
+  timezone: 'Africa/Johannesburg';
+  clientId: string;
+  clientName: string;
+  clientEmail: string;
+  assignedStaffId: string;
+  assignedStaffName: string;
+  assignedStaffEmail: string;
+  purpose: string;
+  safePreparationInstructions: string;
+  attendees: AppointmentAttendee[];
+  
+  // Google Calendar Integration
+  googleCalendarEventId?: string;
+  googleCalendarSyncStatus: GoogleCalendarSyncStatus;
+  googleCalendarHtmlLink?: string;
+  googleCalendarIcsUrl?: string;
+  lastSyncedAt?: string;
+  syncErrorMessage?: string;
+
+  // Zoom PMI Integration (AWS Secrets Manager backed)
+  zoomConfigId?: string;
+  zoomMeetingStatus: ZoomMeetingStatus;
+  
+  // PowerPoint Presentation Linkage (Private S3)
+  hasPowerPoint: boolean;
+  powerPointS3Key?: string;
+  powerPointFilename?: string;
+  powerPointVersion?: string;
+
+  // Automated Reminders
+  remindersConfig: {
+    twentyFourHour: boolean;
+    oneHour: boolean;
+    fifteenMinute: boolean;
+    sentHistory: string[];
+  };
+
+  // Outcome & Notes
+  outcomes?: MeetingOutcome;
+  notes?: string;
+
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+}
+
+export interface ZoomSecretConfiguration {
+  secretArn: string;
+  secretName: string;
+  pmiMasked: string;
+  passcodeMasked: string;
+  waitingRoomEnabled: boolean;
+  hostApprovalRequired: boolean;
+  meetingLockedOnJoin: boolean;
+  muteOnEntry: boolean;
+  screenShareHostOnly: boolean;
+  authRequired: boolean;
+  lastRotated: string;
+  rotationIntervalDays: number;
+}
+
+export interface ZoomMeetingAccessLog {
+  id: string;
+  appointmentId: string;
+  appointmentRef: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  action: 
+    | 'reveal_pmi'
+    | 'reveal_passcode'
+    | 'copy_pmi'
+    | 'copy_passcode'
+    | 'copy_join_url'
+    | 'copy_invitation'
+    | 'join_meeting'
+    | 'start_meeting'
+    | 'open_presentation'
+    | 'record_outcome';
+  timestamp: string;
+  ipAddress: string;
+  userAgent: string;
+  success: boolean;
+  notes?: string;
+}
+
+export interface CalendarSyncJob {
+  id: string;
+  appointmentId: string;
+  appointmentRef: string;
+  jobType: 'create' | 'update' | 'cancel' | 'rsvp_sync' | 'reconcile';
+  status: 'queued' | 'processing' | 'completed' | 'failed';
+  retryCount: number;
+  errorLog?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
+export interface CalendarWebhookChannel {
+  channelId: string;
+  resourceId: string;
+  resourceUri: string;
+  expirationTimestamp: string;
+  isActive: boolean;
+  lastNotificationAt?: string;
+  validationToken: string;
+}
+
+export interface GoogleCalendarConnection {
+  id: string;
+  serviceAccountEmail: string;
+  calendarId: string;
+  primaryTimezone: 'Africa/Johannesburg';
+  syncEnabled: boolean;
+  pushNotificationChannelActive: boolean;
+  lastSyncAuditAt: string;
+}
+
+export interface IntegrationMetrics {
+  calendarEventsCreated: number;
+  calendarSyncFailures: number;
+  appointmentsScheduled: number;
+  appointmentsCompleted: number;
+  appointmentsCancelled: number;
+  clientRsvpAccepted: number;
+  remindersDelivered: number;
+  zoomCardAccessCount: number;
+  failedSecretRetrievals: number;
+  webhookProcessingFailures: number;
+}
+

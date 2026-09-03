@@ -68,14 +68,47 @@ export interface FileTypeMeta {
   previewType: DocumentPreviewType;
 }
 
+export const ALLOWED_IMAGE_EXTENSIONS = [
+  'jpg', 'jpeg', 'png', 'webp', 'heic', 'tiff', 'tif', 'svg', 'bmp', 'ico', 'avif'
+];
+
+export const ALLOWED_PDF_EXTENSIONS = [
+  'pdf', 'pdfa'
+];
+
+export const ALLOWED_CAD_EXTENSIONS = [
+  'dwg', 'dxf', 'dwf', 'ifc', 'step', 'stp', 'iges', 'igs', 'sat', 'skp', 'rvt', 'rfa'
+];
+
+export const ALLOWED_OFFICE_WORD_EXTENSIONS = [
+  'doc', 'docx', 'odt', 'rtf', 'txt'
+];
+
+export const ALLOWED_OFFICE_SPREADSHEET_EXTENSIONS = [
+  'xls', 'xlsx', 'xlsm', 'csv', 'ods'
+];
+
+export const ALLOWED_OFFICE_PRESENTATION_EXTENSIONS = [
+  'ppt', 'pptx', 'odp'
+];
+
+export const ALLOWED_TECHNICAL_ARCHIVE_DATA_EXTENSIONS = [
+  'zip', 'xml', 'json', 'log'
+];
+
+export const ALLOWED_VIDEO_EXTENSIONS = [
+  'mp4', 'mov', 'webm'
+];
+
 export const ALL_PERMITTED_EXTENSIONS = [
-  'jpg', 'jpeg', 'png', 'webp', 'heic', 'tiff', 'svg',
-  'mp4', 'mov', 'webm',
-  'pdf', 'pdfa', 'txt', 'rtf', 'csv',
-  'doc', 'docx', 'xls', 'xlsx', 'xlsm', 'ppt', 'pptx',
-  'odt', 'ods', 'odp',
-  'dwg', 'dxf', 'dwf', 'ifc', 'step', 'stp', 'iges', 'igs', 'sat', 'skp', 'rvt', 'rfa',
-  'xml', 'json', 'log', 'zip'
+  ...ALLOWED_IMAGE_EXTENSIONS,
+  ...ALLOWED_PDF_EXTENSIONS,
+  ...ALLOWED_CAD_EXTENSIONS,
+  ...ALLOWED_OFFICE_WORD_EXTENSIONS,
+  ...ALLOWED_OFFICE_SPREADSHEET_EXTENSIONS,
+  ...ALLOWED_OFFICE_PRESENTATION_EXTENSIONS,
+  ...ALLOWED_TECHNICAL_ARCHIVE_DATA_EXTENSIONS,
+  ...ALLOWED_VIDEO_EXTENSIONS
 ];
 
 // ----------------------------------------------------------------------
@@ -94,6 +127,7 @@ export const PROHIBITED_EXTENSIONS = [
   'app',
   'sh',
   'ps1',
+  'psm1',
   'vbs',
   'iso',
   'dmg',
@@ -106,19 +140,88 @@ export const PROHIBITED_EXTENSIONS = [
   'gadget',
   'inf',
   'scf',
-  'vxd'
+  'vxd',
+  'sys',
+  'bin',
+  'elf',
+  'deb',
+  'rpm',
+  'wasm',
+  'drv',
+  'osx',
+  'run',
+  'vb',
+  'js',
+  'jsx',
+  'ts',
+  'tsx',
+  'php',
+  'py',
+  'pl',
+  'cgi',
+  'asp',
+  'aspx',
+  'jsp',
+  'action',
+  'class'
 ];
 
 export const PROHIBITED_MIME_PATTERNS = [
   'application/x-msdownload',
   'application/x-executable',
+  'application/x-msdos-program',
+  'application/x-msi',
   'application/x-sh',
   'application/x-bat',
   'application/java-archive',
   'application/vnd.android.package-archive',
   'application/x-apple-diskimage',
-  'application/x-iso9660-image'
+  'application/x-iso9660-image',
+  'application/x-dosexec',
+  'application/x-sharedlib',
+  'text/x-shellscript',
+  'text/x-python',
+  'text/x-perl',
+  'text/x-php',
+  'application/x-javascript'
 ];
+
+export interface DocumentValidationOptions {
+  maxSizeMb?: number;
+  allowedCategories?: FileCategoryKey[];
+  allowedExtensions?: string[];
+  allowArchives?: boolean;
+  allowVideos?: boolean;
+  strictDenyByDefault?: boolean;
+}
+
+export interface DocumentValidationResult {
+  isValid: boolean;
+  isProhibited: boolean;
+  isProhibitedExecutable: boolean;
+  isSizeExceeded: boolean;
+  isEmptyFile: boolean;
+  isDoubleExtension: boolean;
+  error: string | null;
+  warning: string | null;
+  fileExtension: string;
+  fileName: string;
+  fileSize: number;
+  fileSizeFormatted: string;
+  detectedMime: string;
+  category: FileCategoryKey;
+  categoryLabel: string;
+  meta: FileTypeMeta;
+  securityLevel: 'passed' | 'warning' | 'rejected_threat';
+  scanDetails: {
+    extensionAllowed: boolean;
+    mimeAllowed: boolean;
+    executableCheck: 'clean' | 'prohibited_payload';
+    spoofingCheck: 'clean' | 'suspicious_double_extension';
+    sizeCheck: 'within_limit' | 'exceeded';
+    ruleEnforced: string;
+  };
+}
 
 /**
  * Checks whether a file violates strict security policies
@@ -126,16 +229,33 @@ export const PROHIBITED_MIME_PATTERNS = [
 export function checkFileSecurity(fileName: string, mimeType?: string): {
   isProhibited: boolean;
   reason?: string;
+  isExecutable?: boolean;
 } {
-  const extMatch = fileName ? fileName.match(/\.([0-9a-z]+)(?:[\?#]|$)/i) : null;
+  const cleanName = fileName.trim();
+  const extMatch = cleanName.match(/\.([0-9a-z]+)(?:[\?#]|$)/i);
   const ext = (extMatch ? extMatch[1] : '').toLowerCase();
   const mime = (mimeType || '').toLowerCase();
+
+  // Check double extension spoofing (e.g. "plan.dwg.exe" or "report.pdf.bat")
+  const parts = cleanName.split('.');
+  if (parts.length > 2) {
+    const secondLastExt = parts[parts.length - 2].toLowerCase();
+    const lastExt = parts[parts.length - 1].toLowerCase();
+    if (PROHIBITED_EXTENSIONS.includes(lastExt)) {
+      return {
+        isProhibited: true,
+        isExecutable: true,
+        reason: `Disguised executable payload detected: double-extension ".${secondLastExt}.${lastExt}" violates Audrin Fire security policy.`
+      };
+    }
+  }
 
   // Check prohibited extensions
   if (PROHIBITED_EXTENSIONS.includes(ext)) {
     return {
       isProhibited: true,
-      reason: `Executable or script extension ".${ext.toUpperCase()}" is strictly prohibited by Audrin Fire safety policies.`
+      isExecutable: true,
+      reason: `Prohibited executable format: ".${ext.toUpperCase()}" binaries, scripts, and installer packages are rejected before processing to protect statutory engineering records.`
     };
   }
 
@@ -144,12 +264,311 @@ export function checkFileSecurity(fileName: string, mimeType?: string): {
     if (mime.includes(pattern)) {
       return {
         isProhibited: true,
-        reason: `MIME signature "${mime}" contains dangerous executable or disk-image payload.`
+        isExecutable: true,
+        reason: `MIME signature "${mime}" contains prohibited executable or disk-image payload.`
       };
     }
   }
 
-  return { isProhibited: false };
+  return { isProhibited: false, isExecutable: false };
+}
+
+/**
+ * Core Document Upload Validation Utility
+ * Enforces allowed file types (Images, PDF, CAD, Office formats) and rejects prohibited executables (EXE, MSI, BAT, etc.)
+ */
+export function validateUploadDocument(
+  file: File | { name: string; size?: number; type?: string },
+  options: DocumentValidationOptions = {}
+): DocumentValidationResult {
+  const {
+    maxSizeMb = 100,
+    allowedCategories,
+    allowedExtensions,
+    allowArchives = true,
+    allowVideos = true,
+    strictDenyByDefault = true
+  } = options;
+
+  const fileName = file.name || 'unnamed_file';
+  const fileSize = typeof file.size === 'number' ? file.size : 0;
+  const detectedMime = file.type || '';
+  const extMatch = fileName.match(/\.([0-9a-z]+)(?:[\?#]|$)/i);
+  const fileExtension = (extMatch ? extMatch[1] : '').toLowerCase();
+  const meta = getFileTypeMeta(fileName, detectedMime);
+  const fileSizeFormatted = formatFileSize(fileSize);
+
+  // 1. Zero-byte corrupt file check
+  if (fileSize === 0 && typeof file.size === 'number') {
+    return {
+      isValid: false,
+      isProhibited: false,
+      isProhibitedExecutable: false,
+      isSizeExceeded: false,
+      isEmptyFile: true,
+      isDoubleExtension: false,
+      error: `File "${fileName}" is empty (0 bytes). Corrupt or zero-byte documents cannot be processed.`,
+      warning: null,
+      fileExtension,
+      fileName,
+      fileSize,
+      fileSizeFormatted,
+      detectedMime,
+      category: meta.category,
+      categoryLabel: meta.label,
+      meta,
+      securityLevel: 'warning',
+      scanDetails: {
+        extensionAllowed: false,
+        mimeAllowed: false,
+        executableCheck: 'clean',
+        spoofingCheck: 'clean',
+        sizeCheck: 'within_limit',
+        ruleEnforced: 'Reject zero-byte payloads'
+      }
+    };
+  }
+
+  // 2. Prohibited Executable & Threat Intercept
+  const securityCheck = checkFileSecurity(fileName, detectedMime);
+  if (securityCheck.isProhibited) {
+    const isDoubleExt = fileName.split('.').length > 2;
+    return {
+      isValid: false,
+      isProhibited: true,
+      isProhibitedExecutable: !!securityCheck.isExecutable,
+      isSizeExceeded: false,
+      isEmptyFile: false,
+      isDoubleExtension: isDoubleExt,
+      error: securityCheck.reason || `Prohibited executable format ".${fileExtension.toUpperCase()}" rejected.`,
+      warning: null,
+      fileExtension,
+      fileName,
+      fileSize,
+      fileSizeFormatted,
+      detectedMime,
+      category: meta.category,
+      categoryLabel: meta.label,
+      meta,
+      securityLevel: 'rejected_threat',
+      scanDetails: {
+        extensionAllowed: false,
+        mimeAllowed: false,
+        executableCheck: 'prohibited_payload',
+        spoofingCheck: isDoubleExt ? 'suspicious_double_extension' : 'clean',
+        sizeCheck: 'within_limit',
+        ruleEnforced: 'SANS Statutory Security Policy: Prohibit Executable Binaries (EXE, MSI, BAT, etc.)'
+      }
+    };
+  }
+
+  // 3. File Size Ceiling Check
+  const sizeMb = fileSize / (1024 * 1024);
+  if (sizeMb > maxSizeMb) {
+    return {
+      isValid: false,
+      isProhibited: false,
+      isProhibitedExecutable: false,
+      isSizeExceeded: true,
+      isEmptyFile: false,
+      isDoubleExtension: false,
+      error: `File size (${fileSizeFormatted}) exceeds the maximum allowed limit of ${maxSizeMb} MB.`,
+      warning: null,
+      fileExtension,
+      fileName,
+      fileSize,
+      fileSizeFormatted,
+      detectedMime,
+      category: meta.category,
+      categoryLabel: meta.label,
+      meta,
+      securityLevel: 'warning',
+      scanDetails: {
+        extensionAllowed: true,
+        mimeAllowed: true,
+        executableCheck: 'clean',
+        spoofingCheck: 'clean',
+        sizeCheck: 'exceeded',
+        ruleEnforced: `Enforce maximum file size envelope of ${maxSizeMb}MB`
+      }
+    };
+  }
+
+  // 4. Allowed Categories & Extensions Filter
+  if (allowedExtensions && allowedExtensions.length > 0) {
+    const normalizedAllowed = allowedExtensions.map((e) => e.toLowerCase().replace(/^\./, ''));
+    if (!normalizedAllowed.includes(fileExtension)) {
+      return {
+        isValid: false,
+        isProhibited: false,
+        isProhibitedExecutable: false,
+        isSizeExceeded: false,
+        isEmptyFile: false,
+        isDoubleExtension: false,
+        error: `Extension ".${fileExtension.toUpperCase()}" is not in the allowed list for this upload field: [${normalizedAllowed.join(', ')}].`,
+        warning: null,
+        fileExtension,
+        fileName,
+        fileSize,
+        fileSizeFormatted,
+        detectedMime,
+        category: meta.category,
+        categoryLabel: meta.label,
+        meta,
+        securityLevel: 'warning',
+        scanDetails: {
+          extensionAllowed: false,
+          mimeAllowed: true,
+          executableCheck: 'clean',
+          spoofingCheck: 'clean',
+          sizeCheck: 'within_limit',
+          ruleEnforced: 'Enforce specific field extension whitelist'
+        }
+      };
+    }
+  }
+
+  if (allowedCategories && allowedCategories.length > 0) {
+    if (!allowedCategories.includes(meta.category)) {
+      return {
+        isValid: false,
+        isProhibited: false,
+        isProhibitedExecutable: false,
+        isSizeExceeded: false,
+        isEmptyFile: false,
+        isDoubleExtension: false,
+        error: `File category "${meta.label}" is not permitted for this upload section. Expected: ${allowedCategories.join(', ')}.`,
+        warning: null,
+        fileExtension,
+        fileName,
+        fileSize,
+        fileSizeFormatted,
+        detectedMime,
+        category: meta.category,
+        categoryLabel: meta.label,
+        meta,
+        securityLevel: 'warning',
+        scanDetails: {
+          extensionAllowed: false,
+          mimeAllowed: false,
+          executableCheck: 'clean',
+          spoofingCheck: 'clean',
+          sizeCheck: 'within_limit',
+          ruleEnforced: 'Enforce specific category whitelist'
+        }
+      };
+    }
+  }
+
+  // 5. General Whitelist Enforcement (Images, PDF, CAD, Office Formats, Technical Data)
+  const isPermittedExtension = ALL_PERMITTED_EXTENSIONS.includes(fileExtension);
+  if (strictDenyByDefault && !isPermittedExtension) {
+    return {
+      isValid: false,
+      isProhibited: false,
+      isProhibitedExecutable: false,
+      isSizeExceeded: false,
+      isEmptyFile: false,
+      isDoubleExtension: false,
+      error: `Unrecognized file type ".${fileExtension.toUpperCase()}". Audrin Fire accepts technical engineering documents: Images (JPG/PNG), PDF, CAD (DWG/DXF/IFC), and MS Office/OpenDoc spreadsheets & reports.`,
+      warning: null,
+      fileExtension,
+      fileName,
+      fileSize,
+      fileSizeFormatted,
+      detectedMime,
+      category: meta.category,
+      categoryLabel: meta.label,
+      meta,
+      securityLevel: 'warning',
+      scanDetails: {
+        extensionAllowed: false,
+        mimeAllowed: false,
+        executableCheck: 'clean',
+        spoofingCheck: 'clean',
+        sizeCheck: 'within_limit',
+        ruleEnforced: 'Deny-by-Default Whitelist Verification'
+      }
+    };
+  }
+
+  // 6. Valid file passes all security inspections
+  let warning: string | null = null;
+  if (fileExtension === 'xlsm') {
+    warning = 'Macro-enabled Excel workbook (.xlsm): Celery worker will sanitize embedded Visual Basic scripts before cloud rendering.';
+  } else if (fileExtension === 'svg') {
+    warning = 'SVG Vector image: XML parser will sanitize script tags and foreign objects to prevent XSS payloads.';
+  }
+
+  return {
+    isValid: true,
+    isProhibited: false,
+    isProhibitedExecutable: false,
+    isSizeExceeded: false,
+    isEmptyFile: false,
+    isDoubleExtension: false,
+    error: null,
+    warning,
+    fileExtension,
+    fileName,
+    fileSize,
+    fileSizeFormatted,
+    detectedMime,
+    category: meta.category,
+    categoryLabel: meta.label,
+    meta,
+    securityLevel: 'passed',
+    scanDetails: {
+      extensionAllowed: true,
+      mimeAllowed: true,
+      executableCheck: 'clean',
+      spoofingCheck: 'clean',
+      sizeCheck: 'within_limit',
+      ruleEnforced: 'Passed SANS 10139 & ISO Engineering Sandbox Verification'
+    }
+  };
+}
+
+/**
+ * Validates a list of files and returns valid files along with detailed diagnostics
+ */
+export function validateMultipleFiles(
+  files: FileList | File[],
+  options: DocumentValidationOptions = {}
+): {
+  validFiles: File[];
+  rejectedResults: DocumentValidationResult[];
+  results: DocumentValidationResult[];
+  hasErrors: boolean;
+  errorCount: number;
+  prohibitedCount: number;
+} {
+  const fileArray = Array.from(files);
+  const results: DocumentValidationResult[] = [];
+  const validFiles: File[] = [];
+  const rejectedResults: DocumentValidationResult[] = [];
+
+  for (const file of fileArray) {
+    const result = validateUploadDocument(file, options);
+    results.push(result);
+    if (result.isValid) {
+      validFiles.push(file);
+    } else {
+      rejectedResults.push(result);
+    }
+  }
+
+  const prohibitedCount = results.filter((r) => r.isProhibited || r.isProhibitedExecutable).length;
+  const errorCount = results.filter((r) => !r.isValid).length;
+
+  return {
+    validFiles,
+    rejectedResults,
+    results,
+    hasErrors: errorCount > 0,
+    errorCount,
+    prohibitedCount
+  };
 }
 
 // ----------------------------------------------------------------------

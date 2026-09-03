@@ -35,7 +35,16 @@ import {
   ConfidentialityLevel,
   PermittedFileTypeConfig,
   QuarantinedFileRecord,
-  DocumentSystemMetrics
+  DocumentSystemMetrics,
+  ComplianceInspection,
+  TechnicianProfile,
+  SuggestedTimeSlot,
+  SANS10139InspectionType,
+  InspectionStatus,
+  PushNotificationItem,
+  PushNotificationPreferences,
+  PushNotificationSeverity,
+  PushNotificationType
 } from '../types';
 import {
   COMPANY_DETAILS,
@@ -58,6 +67,12 @@ import {
   INITIAL_DOCUMENT_METRICS
 } from '../data/initialData';
 import { INITIAL_PERMITTED_FILE_TYPES } from '../utils/fileTypes';
+import {
+  INITIAL_COMPLIANCE_INSPECTIONS,
+  REGISTERED_TECHNICIANS,
+  suggestOpenSlotsForSite,
+  downloadICalFile
+} from '../services/complianceCalendarEngine';
 import { generateAutomatedReply, EmailGenerationInput } from '../services/emailAutomationEngine';
 import {
   generatePreWorkConditionReport,
@@ -75,6 +90,20 @@ import {
   DocumentRevisionInput,
   ProcessingResult
 } from '../services/documentSecurityEngine';
+import {
+  loadPushNotificationHistory,
+  savePushNotificationHistory,
+  loadPushNotificationPreferences,
+  savePushNotificationPreferences,
+  getBrowserNotificationPermission,
+  requestBrowserNotificationPermission,
+  dispatchPushNotification,
+  playNotificationSound,
+  evaluateSystemDeadlinesAndAssignments,
+  INITIAL_SIMULATION_SCENARIOS,
+  PushPermissionStatus,
+  DispatchNotificationOptions
+} from '../services/pushNotificationService';
 
 export interface ToastMessage {
   id: string;
@@ -186,6 +215,22 @@ interface AppContextType {
   generateSignedDownloadToken: (docId: string, versionId?: string) => { downloadUrl: string; expiresAt: string; token: string };
   exportDocumentRegisterCSV: () => string;
 
+  // SANS 10139 Compliance Calendar & Inspection Scheduling State
+  complianceInspections: ComplianceInspection[];
+  technicians: TechnicianProfile[];
+  selectedInspectionForDetail: ComplianceInspection | null;
+  setSelectedInspectionForDetail: (insp: ComplianceInspection | null) => void;
+  isScheduleInspectionModalOpen: boolean;
+  setIsScheduleInspectionModalOpen: (open: boolean) => void;
+  preselectedSiteForSchedule: { siteName: string; city?: string; streetAddress?: string; serviceRequestId?: string; serviceRequestRef?: string } | null;
+  setPreselectedSiteForSchedule: (site: { siteName: string; city?: string; streetAddress?: string; serviceRequestId?: string; serviceRequestRef?: string } | null) => void;
+  scheduleNewInspection: (data: Partial<ComplianceInspection>) => Promise<ComplianceInspection>;
+  rescheduleInspection: (inspectionId: string, newDate: string, newTimeWindow: string, technicianId?: string, notes?: string) => void;
+  cancelInspection: (inspectionId: string, reason?: string) => void;
+  completeInspection: (inspectionId: string, findingsSummary: string, certNumber?: string) => void;
+  getSuggestedSlots: (site: { siteName: string; city?: string; streetAddress?: string }, inspectionType: SANS10139InspectionType, targetDate?: string) => SuggestedTimeSlot[];
+  exportInspectionICal: (inspection: ComplianceInspection) => void;
+
   // Auth
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
@@ -230,6 +275,23 @@ interface AppContextType {
   toasts: ToastMessage[];
   showToast: (type: 'success' | 'error' | 'info' | 'warning', title: string, description: string) => void;
   dismissToast: (id: string) => void;
+
+  // Browser Push Notifications & Background Alerts
+  pushPermission: PushPermissionStatus;
+  pushNotifications: PushNotificationItem[];
+  pushPreferences: PushNotificationPreferences;
+  unreadPushCount: number;
+  isPushCenterOpen: boolean;
+  setIsPushCenterOpen: (open: boolean) => void;
+  requestPushPermission: () => Promise<PushPermissionStatus>;
+  triggerPushSimulation: (scenarioId: string) => Promise<PushNotificationItem | null>;
+  sendPushAlert: (options: DispatchNotificationOptions) => Promise<PushNotificationItem>;
+  markPushAsRead: (id: string) => void;
+  markAllPushAsRead: () => void;
+  clearPushNotification: (id: string) => void;
+  clearAllPushNotifications: () => void;
+  updatePushPreferences: (partial: Partial<PushNotificationPreferences>) => void;
+  testSoundChime: (severity?: PushNotificationSeverity) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -301,6 +363,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isRevisionModalOpen, setIsRevisionModalOpen] = useState<boolean>(false);
   const [selectedDocForRevision, setSelectedDocForRevision] = useState<TechnicalDocument | null>(null);
   const [preselectedRequestIdForDoc, setPreselectedRequestIdForDoc] = useState<string | null>(null);
+
+  // Browser Push Notification State & Control Center
+  const [pushPermission, setPushPermission] = useState<PushPermissionStatus>(getBrowserNotificationPermission());
+  const [pushNotifications, setPushNotifications] = useState<PushNotificationItem[]>(() => loadPushNotificationHistory());
+  const [pushPreferences, setPushPreferences] = useState<PushNotificationPreferences>(() => loadPushNotificationPreferences());
+  const [isPushCenterOpen, setIsPushCenterOpen] = useState<boolean>(false);
+  const unreadPushCount = pushNotifications.filter(n => !n.isRead).length;
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -2062,6 +2131,317 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return csvContent;
   };
 
+  // -------------------------------------------------------------
+  // SANS 10139 COMPLIANCE CALENDAR & INSPECTION SCHEDULING STATE
+  // -------------------------------------------------------------
+  const [complianceInspections, setComplianceInspections] = useState<ComplianceInspection[]>(INITIAL_COMPLIANCE_INSPECTIONS);
+  const [technicians, setTechnicians] = useState<TechnicianProfile[]>(REGISTERED_TECHNICIANS);
+  const [selectedInspectionForDetail, setSelectedInspectionForDetail] = useState<ComplianceInspection | null>(null);
+  const [isScheduleInspectionModalOpen, setIsScheduleInspectionModalOpen] = useState<boolean>(false);
+  const [preselectedSiteForSchedule, setPreselectedSiteForSchedule] = useState<{
+    siteName: string;
+    city?: string;
+    streetAddress?: string;
+    serviceRequestId?: string;
+    serviceRequestRef?: string;
+  } | null>(null);
+
+  // Auto-Suggest Open Slots using the Compliance Algorithm
+  const getSuggestedSlots = (
+    site: { siteName: string; city?: string; streetAddress?: string },
+    inspectionType: SANS10139InspectionType,
+    targetDate?: string
+  ): SuggestedTimeSlot[] => {
+    const startDate = targetDate ? new Date(targetDate) : new Date(2026, 8, 3);
+    return suggestOpenSlotsForSite(site, inspectionType, complianceInspections, startDate);
+  };
+
+  // Schedule a new SANS 10139 Compliance Inspection
+  const scheduleNewInspection = async (data: Partial<ComplianceInspection>): Promise<ComplianceInspection> => {
+    const newId = `insp-${Date.now()}`;
+    const selectedTech = technicians.find(t => t.id === data.assignedTechnicianId) || technicians[0];
+    
+    const newInspection: ComplianceInspection = {
+      id: newId,
+      title: data.title || 'SANS 10139 Scheduled Compliance Servicing',
+      inspectionType: data.inspectionType || 'quarterly_periodic_inspection',
+      standardClause: data.standardClause || 'SANS 10139:2012 Clause 25.3',
+      siteId: data.siteId || `site-${Date.now()}`,
+      siteName: data.siteName || 'Commercial Premises',
+      organisationId: data.organisationId || currentUser?.organisationId || 'org-01',
+      organisationName: data.organisationName || currentUser?.organisationName || 'Client Organisation',
+      streetAddress: data.streetAddress || 'Commercial District',
+      city: data.city || 'Pretoria',
+      serviceRequestId: data.serviceRequestId,
+      serviceRequestRef: data.serviceRequestRef,
+      systemCategory: data.systemCategory || 'Category L1 - Total Life Safety Protection',
+      panelMakeModel: data.panelMakeModel || 'Addressable Fire Alarm Panel',
+      zonesOrLoopsCount: data.zonesOrLoopsCount || '4 Loops',
+      scheduledDate: data.scheduledDate || '2026-09-10',
+      scheduledTimeWindow: data.scheduledTimeWindow || '09:00 - 12:00',
+      assignedTechnicianId: selectedTech.id,
+      assignedTechnicianName: selectedTech.name,
+      technicianSaqccNumber: selectedTech.saqccNumber,
+      technicianPhone: selectedTech.phone,
+      status: 'scheduled',
+      complianceChecklistSummary: data.complianceChecklistSummary && data.complianceChecklistSummary.length > 0
+        ? data.complianceChecklistSummary
+        : [
+            'Inspection of primary and secondary standby power supplies',
+            'Point testing of sample detectors across active zones',
+            'Verification of alarm sounder audibility (minimum 65 dBA)',
+            'Review of on-site fire alarm logbook & false alarm entries'
+          ],
+      estimatedDurationHours: data.estimatedDurationHours || 3.0,
+      notes: data.notes || 'Scheduled via Audrin SANS 10139 Customer Portal',
+      createdAt: new Date().toISOString()
+    };
+
+    setComplianceInspections(prev => [newInspection, ...prev]);
+
+    // If linked to an existing service request, sync by adding a SiteVisit to that request
+    if (data.serviceRequestId) {
+      const targetReq = serviceRequests.find(r => r.id === data.serviceRequestId || r.referenceNumber === data.serviceRequestId);
+      if (targetReq) {
+        scheduleSiteVisit(targetReq.id, {
+          serviceRequestId: targetReq.id,
+          scheduledDate: newInspection.scheduledDate,
+          scheduledTimeWindow: newInspection.scheduledTimeWindow,
+          technicianName: newInspection.assignedTechnicianName,
+          purpose: `${newInspection.title} (${newInspection.standardClause})`,
+          status: 'Scheduled',
+          notes: newInspection.notes
+        });
+      }
+    }
+
+    addAuditLog(
+      'SCHEDULE_INSPECTION',
+      'ComplianceInspection',
+      newId,
+      `Scheduled ${newInspection.title} for ${newInspection.siteName} on ${newInspection.scheduledDate} (${newInspection.assignedTechnicianName})`
+    );
+
+    showToast(
+      'success',
+      'Inspection Scheduled & Confirmed',
+      `${newInspection.title} confirmed for ${newInspection.siteName} on ${newInspection.scheduledDate} (${newInspection.scheduledTimeWindow}). Assigned: ${selectedTech.name} (${selectedTech.saqccNumber}).`
+    );
+
+    return newInspection;
+  };
+
+  // Reschedule an Inspection with Suggested Slots
+  const rescheduleInspection = (
+    inspectionId: string,
+    newDate: string,
+    newTimeWindow: string,
+    technicianId?: string,
+    notes?: string
+  ) => {
+    setComplianceInspections(prev =>
+      prev.map(insp => {
+        if (insp.id === inspectionId) {
+          const tech = technicianId ? technicians.find(t => t.id === technicianId) || technicians[0] : technicians.find(t => t.id === insp.assignedTechnicianId) || technicians[0];
+          return {
+            ...insp,
+            scheduledDate: newDate,
+            scheduledTimeWindow: newTimeWindow,
+            assignedTechnicianId: tech.id,
+            assignedTechnicianName: tech.name,
+            technicianSaqccNumber: tech.saqccNumber,
+            technicianPhone: tech.phone,
+            status: 'scheduled',
+            notes: notes ? `${insp.notes || ''} | Rescheduled: ${notes}` : insp.notes
+          };
+        }
+        return insp;
+      })
+    );
+
+    addAuditLog(
+      'RESCHEDULE_INSPECTION',
+      'ComplianceInspection',
+      inspectionId,
+      `Rescheduled inspection ${inspectionId} to ${newDate} (${newTimeWindow})`
+    );
+
+    showToast('info', 'Inspection Rescheduled', `Updated slot to ${newDate} (${newTimeWindow}).`);
+  };
+
+  // Cancel an inspection
+  const cancelInspection = (inspectionId: string, reason?: string) => {
+    setComplianceInspections(prev =>
+      prev.map(insp => (insp.id === inspectionId ? { ...insp, status: 'rescheduled', notes: reason ? `Cancelled/Postponed: ${reason}` : insp.notes } : insp))
+    );
+    showToast('warning', 'Inspection Postponed', 'The inspection slot has been released for rescheduling.');
+  };
+
+  // Complete an inspection
+  const completeInspection = (inspectionId: string, findingsSummary: string, certNumber?: string) => {
+    const cert = certNumber || `SANS-COC-${Math.floor(10000 + Math.random() * 90000)}`;
+    setComplianceInspections(prev =>
+      prev.map(insp =>
+        insp.id === inspectionId
+          ? {
+              ...insp,
+              status: 'completed',
+              completionDate: new Date().toISOString(),
+              findingsSummary,
+              certificateIssued: true,
+              certificateNumber: cert
+            }
+          : insp
+      )
+    );
+    showToast('success', 'Inspection Completed', `Compliance verified and logged. Certificate: ${cert}`);
+  };
+
+  // Export iCalendar file
+  const exportInspectionICal = (inspection: ComplianceInspection) => {
+    downloadICalFile(inspection);
+    showToast('info', 'Calendar Event Exported', `Downloaded .ics event for ${inspection.title}. You can import this into Google Calendar or Outlook.`);
+  };
+
+  // Browser Push Notification Actions & Watchdog
+  const requestPushPermission = async (): Promise<PushPermissionStatus> => {
+    const status = await requestBrowserNotificationPermission();
+    setPushPermission(status);
+    if (status === 'granted') {
+      showToast('success', 'Push Notifications Enabled', 'You will receive background alerts for urgent dispatches and maintenance deadlines.');
+    } else if (status === 'denied') {
+      showToast('warning', 'Notifications Blocked', 'Please allow notifications in your browser address bar permissions to receive live push alerts.');
+    }
+    return status;
+  };
+
+  const updatePushPreferences = (partial: Partial<PushNotificationPreferences>) => {
+    setPushPreferences((prev) => {
+      const updated = { ...prev, ...partial };
+      savePushNotificationPreferences(updated);
+      return updated;
+    });
+    showToast('info', 'Notification Preferences Saved', 'Your alert and sound configuration has been updated.');
+  };
+
+  const sendPushAlert = async (options: DispatchNotificationOptions): Promise<PushNotificationItem> => {
+    const notif = await dispatchPushNotification(options, pushPreferences);
+    setPushNotifications((prev) => {
+      const updated = [notif, ...prev.filter((n) => n.id !== notif.id)].slice(0, 100);
+      savePushNotificationHistory(updated);
+      return updated;
+    });
+    return notif;
+  };
+
+  const triggerPushSimulation = async (scenarioId: string): Promise<PushNotificationItem | null> => {
+    const scenario = INITIAL_SIMULATION_SCENARIOS.find((s) => s.id === scenarioId);
+    if (!scenario) return null;
+
+    const notif = await dispatchPushNotification(
+      {
+        title: scenario.title,
+        body: scenario.body,
+        type: scenario.type,
+        severity: scenario.severity,
+        targetRole: scenario.targetRole,
+        siteName: scenario.siteName,
+        serviceRequestRef: scenario.serviceRequestRef,
+        standardClause: scenario.standardClause,
+        slaDeadline: scenario.slaDeadline,
+        technicianName: scenario.technicianName,
+        actionUrl: scenario.actionView,
+        actionLabel: scenario.actionLabel
+      },
+      pushPreferences
+    );
+
+    setPushNotifications((prev) => {
+      const updated = [notif, ...prev.filter((n) => n.id !== notif.id)].slice(0, 100);
+      savePushNotificationHistory(updated);
+      return updated;
+    });
+
+    showToast(
+      scenario.severity === 'critical' ? 'error' : scenario.severity === 'high' ? 'warning' : 'info',
+      `Push Alert Triggered`,
+      `${scenario.title}`
+    );
+
+    return notif;
+  };
+
+  const markPushAsRead = (id: string) => {
+    setPushNotifications((prev) => {
+      const updated = prev.map((n) => (n.id === id ? { ...n, isRead: true } : n));
+      savePushNotificationHistory(updated);
+      return updated;
+    });
+  };
+
+  const markAllPushAsRead = () => {
+    setPushNotifications((prev) => {
+      const updated = prev.map((n) => ({ ...n, isRead: true }));
+      savePushNotificationHistory(updated);
+      return updated;
+    });
+    showToast('info', 'Notifications Read', 'All alerts in history marked as read.');
+  };
+
+  const clearPushNotification = (id: string) => {
+    setPushNotifications((prev) => {
+      const updated = prev.filter((n) => n.id !== id);
+      savePushNotificationHistory(updated);
+      return updated;
+    });
+  };
+
+  const clearAllPushNotifications = () => {
+    setPushNotifications([]);
+    savePushNotificationHistory([]);
+    showToast('info', 'Notification Tray Cleared', 'Notification history reset.');
+  };
+
+  const testSoundChime = (severity: PushNotificationSeverity = 'high') => {
+    playNotificationSound(severity);
+    showToast('info', 'Audio Chime Tested', `Played synthesized ${severity.toUpperCase()} urgency chime.`);
+  };
+
+  // Background Evaluation Watchdog for Inspections & Dispatches
+  useEffect(() => {
+    if (!pushPreferences.enabled) return;
+
+    const runWatchdog = () => {
+      evaluateSystemDeadlinesAndAssignments(
+        complianceInspections,
+        serviceRequests,
+        pushPreferences,
+        (newNotif) => {
+          setPushNotifications((prev) => [newNotif, ...prev.filter((n) => n.id !== newNotif.id)].slice(0, 100));
+        }
+      );
+    };
+
+    runWatchdog();
+
+    const intervalMs = Math.max(15, (pushPreferences.backgroundPollingIntervalMinutes || 0.5) * 60) * 1000;
+    const intervalId = setInterval(runWatchdog, intervalMs);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        runWatchdog();
+        setPushPermission(getBrowserNotificationPermission());
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [complianceInspections, serviceRequests, pushPreferences]);
+
   // Real-time System Metrics calculation
   const systemMetrics: SystemMetrics = {
     requestsCountTotal: serviceRequests.length,
@@ -2175,6 +2555,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         requestMissingDocument,
         generateSignedDownloadToken,
         exportDocumentRegisterCSV,
+
+        // SANS 10139 Compliance Calendar & Inspection Scheduling
+        complianceInspections,
+        technicians,
+        selectedInspectionForDetail,
+        setSelectedInspectionForDetail,
+        isScheduleInspectionModalOpen,
+        setIsScheduleInspectionModalOpen,
+        preselectedSiteForSchedule,
+        setPreselectedSiteForSchedule,
+        scheduleNewInspection,
+        rescheduleInspection,
+        cancelInspection,
+        completeInspection,
+        getSuggestedSlots,
+        exportInspectionICal,
+
+        // Browser Push Notifications & Background Alerts
+        pushPermission,
+        pushNotifications,
+        pushPreferences,
+        unreadPushCount,
+        isPushCenterOpen,
+        setIsPushCenterOpen,
+        requestPushPermission,
+        triggerPushSimulation,
+        sendPushAlert,
+        markPushAsRead,
+        markAllPushAsRead,
+        clearPushNotification,
+        clearAllPushNotifications,
+        updatePushPreferences,
+        testSoundChime,
 
         currentUser,
         setCurrentUser,

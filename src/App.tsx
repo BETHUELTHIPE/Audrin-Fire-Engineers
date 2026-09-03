@@ -12,6 +12,8 @@ import { VideoEvidenceDetailModal } from './components/VideoEvidenceDetailModal'
 import { ConditionReportDetailModal } from './components/ConditionReportDetailModal';
 import { SubmitBeforeWorkEvidenceModal } from './components/SubmitBeforeWorkEvidenceModal';
 import { SubmitPostWorkEvidenceModal } from './components/SubmitPostWorkEvidenceModal';
+import { SANS10139OfflineSyncBanner } from './components/SANS10139OfflineSyncBanner';
+import { PushNotificationCenterModal } from './components/PushNotificationCenterModal';
 
 import { HomeView } from './views/HomeView';
 import { AboutView } from './views/AboutView';
@@ -28,6 +30,7 @@ import { AuthView } from './views/AuthView';
 const MainContent: React.FC = () => {
   const {
     activeView,
+    currentUser,
     selectedReportForDetail,
     setSelectedReportForDetail,
     isSubmitBeforeWorkModalOpen,
@@ -58,6 +61,9 @@ const MainContent: React.FC = () => {
       case 'admin-portal':
         return <AdminPortalView />;
       case 'legal':
+        if (currentUser) {
+          return <CustomerPortalView initialSection="sans_legal_hub" />;
+        }
         return <LegalView />;
       case 'auth':
         return <AuthView />;
@@ -69,6 +75,7 @@ const MainContent: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-white text-slate-900 font-sans selection:bg-red-500 selection:text-white">
       <Header />
+      <SANS10139OfflineSyncBanner />
       <main className="flex-1">
         {renderActiveView()}
       </main>
@@ -101,6 +108,9 @@ const MainContent: React.FC = () => {
           onClose={() => setIsSubmitPostWorkModalOpen(false)}
         />
       )}
+
+      {/* SANS 10139 Browser Push Notification Control Center Modal */}
+      <PushNotificationCenterModal />
 
       <Toasts />
     </div>

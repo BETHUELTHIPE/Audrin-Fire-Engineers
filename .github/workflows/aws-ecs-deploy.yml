@@ -1,0 +1,193 @@
+name: Deploy Audrin Fire Engineers to AWS ECS Fargate & Amazon S3
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment Environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+env:
+  AWS_REGION: af-south-1 # Cape Town region (or eu-west-1 / us-east-1)
+  ECR_REPOSITORY: audrin-fire-engineers
+  ECS_CLUSTER: audrin-fire-cluster-prod
+  S3_STATIC_BUCKET: audrin-fire-static-assets-production
+  S3_PRIVATE_MEDIA_BUCKET: audrin-fire-private-media-production
+  CLOUDFRONT_DISTRIBUTION_ID: ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}
+  DOCKER_IMAGE: bethuelm/audrin-fire-engineers
+
+jobs:
+  test-and-lint:
+    name: 1. Code Quality, Typecheck & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Verification & Lint
+        run: npm run lint
+
+      - name: Build Production Bundle Test
+        run: npm run build
+
+  build-and-push-images:
+    name: 2. Build & Push Docker Container to Docker Hub & AWS ECR
+    needs: test-and-lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME || 'bethuelm' }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            bethuelm/audrin-fire-engineers
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+            type=ref,event=branch
+
+      - name: Build and Push Docker Multi-Arch Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-s3-static-assets:
+    name: 3. Sync Static Assets to Amazon S3 & Invalidate CloudFront
+    needs: build-and-push-images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install & Compile Static Files
+        run: |
+          npm ci
+          npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync Static Assets to S3 (Immutable Hashed Files)
+        run: |
+          aws s3 sync dist/ s3://${{ env.S3_STATIC_BUCKET }}/static/next/${{ github.sha }}/ \
+            --cache-control "public, max-age=31536000, immutable" \
+            --delete
+
+          aws s3 sync dist/ s3://${{ env.S3_STATIC_BUCKET }}/ \
+            --exclude "assets/*" \
+            --cache-control "public, max-age=300, must-revalidate"
+
+      - name: Invalidate CloudFront Cache
+        if: env.CLOUDFRONT_DISTRIBUTION_ID != ''
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/index.html" "/assets/*"
+
+  deploy-ecs-fargate:
+    name: 4. Deploy ECS Fargate Services (Blue/Green Rolling)
+    needs: [build-and-push-images, publish-s3-static-assets]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Run Database Migrations as Controlled One-Off ECS Task
+        run: |
+          echo "Running controlled database migration task on Amazon RDS PostgreSQL..."
+          aws ecs run-task \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --task-definition audrin-fire-migration-task \
+            --launch-type FARGATE \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.PRIVATE_APP_SUBNET_1 }},${{ secrets.PRIVATE_APP_SUBNET_2 }}],securityGroups=[${{ secrets.ECS_SECURITY_GROUP }}],assignPublicIp=DISABLED}" \
+            --overrides '{"containerOverrides":[{"name":"django-migrator","command":["python","manage.py","migrate","--noinput"]}]}'
+
+      - name: Update ECS Next.js Frontend Service
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service nextjs-frontend-service \
+            --force-new-deployment
+
+      - name: Update ECS Django Backend & Celery Services
+        run: |
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service django-backend-service --force-new-deployment
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service celery-worker-service --force-new-deployment
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service celery-beat-service --force-new-deployment
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service video-doc-worker-service --force-new-deployment
+          aws ecs update-service --cluster ${{ env.ECS_CLUSTER }} --service notification-worker-service --force-new-deployment
+
+      - name: Verify Service Health & Stability
+        run: |
+          echo "Waiting for services to reach steady state..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services nextjs-frontend-service django-backend-service celery-beat-service
+          echo "✅ Production Deployment to AWS ECS Fargate & S3 Succeeded!"

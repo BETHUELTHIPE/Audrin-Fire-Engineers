@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export const Footer: React.FC = () => {
-  const { setActiveView, setSelectedServiceSlug, services, setIsEmergencyModalOpen, setIsRequestModalOpen } = useApp();
+  const { currentUser, setActiveView, setSelectedServiceSlug, services, setIsEmergencyModalOpen, setIsRequestModalOpen } = useApp();
   const [copied, setCopied] = useState(false);
 
   const handleServiceClick = (slug: string) => {
@@ -191,6 +191,16 @@ export const Footer: React.FC = () => {
               Process &amp; Platform
             </h4>
             <ul className="space-y-2 text-xs text-slate-300">
+              <li>
+                <button
+                  onClick={() => handleNavClick(currentUser ? 'customer-portal' : 'legal')}
+                  className="hover:text-white transition-colors text-amber-300 font-bold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#CC0000]" />
+                  <span>SANS Legal &amp; Regulatory Hub</span>
+                  <span className="text-[10px] text-amber-400/80 font-mono font-normal">(Client Portal)</span>
+                </button>
+              </li>
               <li>
                 <button onClick={() => handleNavClick('how-we-work')} className="hover:text-white transition-colors cursor-pointer">
                   7-Step How We Work Timeline

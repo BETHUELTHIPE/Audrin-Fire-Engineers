@@ -36,10 +36,20 @@ import {
   ShieldAlert,
   Copy,
   ExternalLink,
-  Layers
+  Layers,
+  Cloud,
+  HardDrive,
+  Terminal
 } from 'lucide-react';
 import { RequestStatus, ServiceItem, FAQItem, VideoReviewStatus } from '../types';
 import { DocumentEvidenceVault } from '../components/DocumentEvidenceVault';
+import { PushNotificationPermissionBanner } from '../components/PushNotificationPermissionBanner';
+import { AwsCloudArchitectureModal } from '../components/AwsCloudArchitectureModal';
+import { AwsArchitectureDiagram } from '../components/AwsArchitectureDiagram';
+import { GoogleCalendarZoomAdminHub } from '../components/GoogleCalendarZoomAdminHub';
+import { SafetyFileDashboard } from '../components/SafetyFileDashboard';
+import { ComplianceAuditLog } from '../components/ComplianceAuditLog';
+import { Bell } from 'lucide-react';
 
 export const AdminPortalView: React.FC = () => {
   const {
@@ -83,10 +93,12 @@ export const AdminPortalView: React.FC = () => {
     setIsSubmitPostWorkModalOpen,
     setPreselectedRequestIdForReport,
     // Technical Documents & CAD Vault
-    technicalDocuments
+    technicalDocuments,
+    setIsPushCenterOpen
   } = useApp();
 
-  const [activeSection, setActiveSection] = useState<'requests' | 'reports' | 'documents' | 'videos' | 'voice' | 'emails' | 'cms' | 'audit' | 'metrics'>('requests');
+  const [activeSection, setActiveSection] = useState<'requests' | 'reports' | 'safety_files' | 'calendar_zoom' | 'documents' | 'videos' | 'voice' | 'emails' | 'cms' | 'audit' | 'metrics' | 'aws_cloud'>('requests');
+  const [isAwsModalOpen, setIsAwsModalOpen] = useState(false);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(serviceRequests[0]?.id || null);
 
   // Condition reports filter state
@@ -237,15 +249,36 @@ export const AdminPortalView: React.FC = () => {
               </p>
             </div>
 
-            {/* Health Indicators Badge */}
-            <div className="flex items-center gap-2 text-xs bg-slate-900/80 border border-slate-700 p-2.5 rounded-sm self-start md:self-auto font-mono">
+            {/* Health Indicators & AWS / Push Trigger Badges */}
+            <div className="flex items-center gap-2 text-xs bg-slate-900/80 border border-slate-700 p-2.5 rounded-sm self-start md:self-auto font-mono flex-wrap">
+              <button
+                type="button"
+                id="btn-open-aws-cloud-modal"
+                onClick={() => setIsAwsModalOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 text-white font-bold transition-all cursor-pointer shadow-xs"
+                title="Open AWS ECS Fargate & Amazon S3 Production Architecture Hub"
+              >
+                <Cloud className="w-3.5 h-3.5 text-amber-200" />
+                <span>AWS ECS & S3 Hub</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPushCenterOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm bg-[#CC0000] hover:bg-red-700 text-white font-bold transition-colors cursor-pointer shadow-xs"
+                title="Open SANS 10139 Browser Push Notification Center & Dispatch Simulator"
+              >
+                <Bell className="w-3.5 h-3.5 text-[#FFB703] animate-pulse" />
+                <span>Push SLA Center</span>
+              </button>
+
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-sm bg-emerald-950 text-emerald-300 border border-emerald-800">
                 <Database className="w-3 h-3 text-emerald-400" />
-                <span>PostgreSQL: 100% Online</span>
+                <span>RDS Multi-AZ</span>
               </div>
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-sm bg-emerald-950 text-emerald-300 border border-emerald-800">
                 <Server className="w-3 h-3 text-emerald-400" />
-                <span>Celery Workers: 4 Active</span>
+                <span>ECS: 10 Tasks</span>
               </div>
             </div>
           </div>
@@ -254,6 +287,8 @@ export const AdminPortalView: React.FC = () => {
 
       {/* Main Operations Navigation Tabs */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <PushNotificationPermissionBanner className="mb-4" />
+
         <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto text-xs font-mono font-bold no-scrollbar">
           <button
             onClick={() => setActiveSection('requests')}
@@ -277,6 +312,45 @@ export const AdminPortalView: React.FC = () => {
           >
             <FileText className="w-4 h-4 text-amber-500" />
             <span>Condition Reports ({conditionReports.length})</span>
+          </button>
+
+          <button
+            id="admin-nav-safety-files"
+            onClick={() => setActiveSection('safety_files')}
+            className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'safety_files'
+                ? 'bg-[#0A192F] text-white shadow-sm border-b-2 border-b-[#CC0000]'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span>Safety Files (Site Dossiers)</span>
+          </button>
+
+          <button
+            id="admin-nav-calendar-zoom"
+            onClick={() => setActiveSection('calendar_zoom')}
+            className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'calendar_zoom'
+                ? 'bg-blue-600 text-white shadow-sm border-b-2 border-b-blue-400'
+                : 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200 font-bold'
+            }`}
+          >
+            <Calendar className="w-4 h-4 text-blue-600" />
+            <Video className="w-4 h-4 text-indigo-600" />
+            <span>Google Calendar &amp; Zoom PMI</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSection('aws_cloud')}
+            className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'aws_cloud'
+                ? 'bg-[#0A192F] text-white shadow-sm border-b-2 border-b-amber-500'
+                : 'bg-amber-50 text-amber-950 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            <Cloud className="w-4 h-4 text-amber-600" />
+            <span>AWS ECS & S3 Architecture</span>
           </button>
 
           <button
@@ -874,6 +948,17 @@ export const AdminPortalView: React.FC = () => {
         </section>
       )}
 
+      {/* SECTION: Fire Detection Safety Files Dashboard (SANS 10139 Dossiers) */}
+      {activeSection === 'safety_files' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <SafetyFileDashboard
+            currentUserRole={currentUser?.role || 'admin'}
+            currentUserName={currentUser?.fullName || 'Senior Fire Engineer'}
+            onViewComplianceAudit={() => setActiveSection('audit')}
+          />
+        </section>
+      )}
+
       {/* SECTION: Technical Documents & CAD Evidence Vault */}
       {activeSection === 'documents' && (
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -1393,12 +1478,30 @@ export const AdminPortalView: React.FC = () => {
         </section>
       )}
 
-      {/* SECTION 6: Audit Logs */}
+      {/* SECTION 6: Audit Logs & Regulatory Traceability */}
       {activeSection === 'audit' && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="bg-white border border-slate-200 rounded-sm overflow-hidden shadow-sm text-xs font-mono">
-            <div className="p-4 bg-slate-50 border-b border-slate-200">
-              <h3 className="font-bold text-[#0A192F] uppercase">POPIA & Operations Immutable Audit Trail</h3>
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          {/* Statutory Compliance Audit Log Component */}
+          <ComplianceAuditLog
+            onViewSafetyFile={() => {
+              setActiveSection('safety_files');
+            }}
+          />
+
+          {/* Collapsible / Secondary Platform Operations & POPIA Log */}
+          <div className="bg-white border-2 border-slate-200 rounded-xs overflow-hidden shadow-2xs text-xs font-mono">
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-[#0A192F] uppercase">
+                  Platform Operations &amp; Legacy Web Activity Log
+                </h3>
+                <p className="text-[11px] text-slate-500 font-sans mt-0.5">
+                  General background ticket events, enquiry submissions, and operational telemetry ({auditLogs.length} Records)
+                </p>
+              </div>
+              <span className="text-[10px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-xs font-bold uppercase">
+                Worker Stream
+              </span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -1418,7 +1521,7 @@ export const AdminPortalView: React.FC = () => {
                       <td className="p-3 text-slate-400">{new Date(log.timestamp).toLocaleString()}</td>
                       <td className="p-3 font-semibold text-slate-900">{log.actor}</td>
                       <td className="p-3">
-                        <span className="px-2 py-0.5 rounded-sm bg-slate-200 text-slate-900 font-bold text-[10px]">
+                        <span className="px-2 py-0.5 rounded-xs bg-slate-200 text-slate-900 font-bold text-[10px]">
                           {log.action}
                         </span>
                       </td>
@@ -1462,6 +1565,50 @@ export const AdminPortalView: React.FC = () => {
         </section>
       )}
 
+      {/* SECTION: Google Calendar & Zoom Personal Meeting Room Administration Hub */}
+      {activeSection === 'calendar_zoom' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <GoogleCalendarZoomAdminHub
+            currentUserRole={currentUser?.role || 'admin'}
+            currentUserId={currentUser?.id || 'admin-001'}
+            currentUserName={currentUser?.fullName || 'Lead Administrator'}
+          />
+        </section>
+      )}
+
+      {/* SECTION 8: AWS ECS Fargate, S3 & Cloud Architecture */}
+      {activeSection === 'aws_cloud' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 text-white p-4 rounded-xl border border-slate-800">
+            <div>
+              <h2 className="text-base font-bold flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-amber-400" />
+                AWS Production Cloud Architecture & Deployment Control
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Terraform IaC, Amazon ECS Fargate Multi-AZ cluster, S3 Evidence Vault, SNS/SQS event bus, and Docker Hub pipeline.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsAwsModalOpen(true)}
+              className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              Launch Cloud Control Center
+            </button>
+          </div>
+
+          <AwsArchitectureDiagram onSelectNode={() => setIsAwsModalOpen(true)} />
+        </section>
+      )}
+
+      {/* AWS Cloud Architecture & ECS Fargate Modal */}
+      <AwsCloudArchitectureModal 
+        isOpen={isAwsModalOpen} 
+        onClose={() => setIsAwsModalOpen(false)} 
+      />
+
     </div>
   );
 };
+

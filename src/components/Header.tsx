@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { BrandLogo } from './BrandLogo';
 import { COMPANY_DETAILS } from '../data/initialData';
+import { PushNotificationBell } from './PushNotificationBell';
 import {
   Phone,
   Mail,
@@ -18,7 +19,8 @@ import {
   ChevronDown,
   Wrench,
   CheckCircle2,
-  ExternalLink
+  ExternalLink,
+  Bell
 } from 'lucide-react';
 
 export const Header: React.FC = () => {
@@ -129,6 +131,9 @@ export const Header: React.FC = () => {
             <div className="hidden sm:inline-block text-slate-400 text-[10px]">
               <span>Reg No: <strong className="text-slate-200 font-mono">{COMPANY_DETAILS.registrationNumber}</strong></span>
             </div>
+
+            {/* Push Notification Bell in Top Bar */}
+            <PushNotificationBell className="shrink-0" />
 
             {/* Quick Demo Role Switcher */}
             <div className="relative">
