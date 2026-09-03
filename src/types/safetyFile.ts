@@ -221,3 +221,115 @@ export interface SafetyFile {
   auditTrail: SafetyFileAuditLog[];
   emailDeliveries: SafetyFileEmailDelivery[];
 }
+
+export type StatutoryStandardSource =
+  | 'SANS_10139_2012'
+  | 'SANS_10400_T_2011'
+  | 'OHS_ACT_85_1993'
+  | 'SAQCC_COMMISSIONER';
+
+export interface SourceComplianceClause {
+  standard: StatutoryStandardSource;
+  clauseRef: string;
+  clauseTitle: string;
+  exactWording: string;
+  statutoryMandate: string;
+  applicableSection: number;
+}
+
+export interface SectionChecklistItem {
+  id: string;
+  clauseRef: string;
+  requirementText: string;
+  isMandatory: boolean;
+  standard: StatutoryStandardSource;
+}
+
+export interface MandatoryDocumentTemplate {
+  templateCode: string;
+  title: string;
+  documentNumberPattern: string;
+  standardClause: string;
+  governingStandard: StatutoryStandardSource;
+  requiredRole: string;
+  description: string;
+  exactComplianceWording: string;
+  isMandatory: boolean;
+}
+
+export interface SectionDefinition {
+  sectionNumber: number;
+  title: string;
+  category: 'Administrative' | 'Technical' | 'Statutory' | 'Handover';
+  standardReference: string;
+  governingStandard: StatutoryStandardSource;
+  description: string;
+  iconName: string;
+  mandatoryDocumentTemplates: MandatoryDocumentTemplate[];
+  signatoryRolesRequired: string[];
+  complianceChecklist: SectionChecklistItem[];
+}
+
+export interface WorkflowTransitionValidation {
+  ruleCode: string;
+  ruleDescription: string;
+  passed: boolean;
+  failureReason?: string;
+  remedialAction?: string;
+}
+
+export interface WorkflowTransitionResult {
+  success: boolean;
+  fromStatus: string;
+  toStatus: string;
+  entityId: string;
+  entityType: 'dossier' | 'document';
+  timestamp: string;
+  performedBy: {
+    name: string;
+    role: string;
+    credentialNumber?: string;
+  };
+  validations: WorkflowTransitionValidation[];
+  errorMessage?: string;
+}
+
+export interface DossierValidationReport {
+  fileId: string;
+  safetyFileNumber: string;
+  currentStatus: SafetyFileStatus;
+  canAdvanceToUnderReview: boolean;
+  canAdvanceToApproved: boolean;
+  canAdvanceToIssued: boolean;
+  blockingIssues: string[];
+  warnings: string[];
+  totalSections: number;
+  completedSections: number;
+  mandatoryDocumentsCount: number;
+  approvedDocumentsCount: number;
+  issuedDocumentsCount: number;
+  missingDocumentsCount: number;
+  expiredDocumentsCount: number;
+  isCommissionerApproved: boolean;
+  isClientAcknowledged: boolean;
+  sans10139ComplianceRate: number;
+  sans10400TComplianceRate: number;
+  overallComplianceScore: number;
+  statutorySourceValidation: {
+    sans10139Adherence: boolean;
+    sans10400TAdherence: boolean;
+    missingMandatoryClauses: string[];
+  };
+}
+
+export interface ApprovedSourcePDFDefinition {
+  id: 'SANS_10139_2012' | 'SANS_10400_T_2011';
+  documentName: string;
+  officialReference: string;
+  edition: string;
+  issuingBody: string;
+  statutoryEnforcement: string;
+  scopeSummary: string;
+  approvedSectionsMapped: number[];
+  mandatoryVerbatimClauses: SourceComplianceClause[];
+}

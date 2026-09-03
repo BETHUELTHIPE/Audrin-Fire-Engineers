@@ -10,6 +10,7 @@ import { safetyFileService } from '../services/safetyFileService';
 import { validateFile } from '../utils/fileValidation';
 import { SafetyFileCover } from './SafetyFileCover';
 import { SafetyFileIndexPage } from './SafetyFileIndexPage';
+import { StatutoryComplianceWorkflowTab } from './StatutoryComplianceWorkflowTab';
 import {
   X,
   Flame,
@@ -61,7 +62,7 @@ export const SafetyFileViewerModal: React.FC<SafetyFileViewerModalProps> = ({
   onFileUpdated
 }) => {
   const [safetyFile, setSafetyFile] = useState<SafetyFile>(initialSafetyFile);
-  const [activeTab, setActiveTab] = useState<'cover' | 'index' | 'sections' | 'approvals' | 'audit'>('cover');
+  const [activeTab, setActiveTab] = useState<'cover' | 'index' | 'sections' | 'approvals' | 'workflow-gates' | 'audit'>('cover');
   const [selectedSectionNumber, setSelectedSectionNumber] = useState<number>(1);
   const [selectedDocument, setSelectedDocument] = useState<SafetyFileDocument | null>(null);
 
@@ -408,6 +409,19 @@ export const SafetyFileViewerModal: React.FC<SafetyFileViewerModalProps> = ({
           </button>
 
           <button
+            id="tab-statutory-workflow-gates"
+            onClick={() => { setActiveTab('workflow-gates'); setSelectedDocument(null); }}
+            className={`px-4 py-3 font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+              activeTab === 'workflow-gates'
+                ? 'border-[#CC0000] text-[#CC0000]'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>5. Statutory Gates &amp; Workflow (SANS 10139 / 10400-T)</span>
+          </button>
+
+          <button
             onClick={() => { setActiveTab('audit'); setSelectedDocument(null); }}
             className={`px-4 py-3 font-bold border-b-2 transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               activeTab === 'audit'
@@ -416,7 +430,7 @@ export const SafetyFileViewerModal: React.FC<SafetyFileViewerModalProps> = ({
             }`}
           >
             <History className="w-3.5 h-3.5" />
-            <span>5. Audit Trail &amp; Deliveries</span>
+            <span>6. Audit Trail &amp; Deliveries</span>
           </button>
         </div>
 
@@ -893,6 +907,19 @@ export const SafetyFileViewerModal: React.FC<SafetyFileViewerModalProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* TAB 5: STATUTORY GATES & WORKFLOW (SANS 10139 / 10400-T) */}
+        {activeTab === 'workflow-gates' && (
+          <StatutoryComplianceWorkflowTab
+            safetyFile={safetyFile}
+            currentUserRole={currentUserRole}
+            currentUserName={currentUserName}
+            onFileUpdated={(updated) => {
+              setSafetyFile(updated);
+              onFileUpdated?.(updated);
+            }}
+          />
         )}
 
         {/* UPLOAD DOCUMENT MODAL OVERLAY */}
