@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   MapPin,
   Plus,
@@ -23,14 +23,28 @@ import {
   Stethoscope,
   Server,
   ShoppingBag,
-  RefreshCw
+  RefreshCw,
+  Layers,
+  ShieldCheck,
+  AlertTriangle,
+  XCircle,
+  Activity,
+  Play,
+  RotateCcw,
+  Crosshair,
+  Move,
+  Volume2,
+  ChevronRight
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { FloorPlanGeneratorModal } from './FloorPlanGeneratorModal';
+import { InteractiveFloorplanOverlay } from './InteractiveFloorplanOverlay';
+import { CLIENT_SITE_MAINTENANCE_PROFILES } from '../../data/serviceDueData';
 import {
   GeneratedFloorPlan,
   BuildingArchetype,
-  MappedFloorDevice
+  MappedFloorDevice,
+  BlueprintTheme
 } from '../../types/floorplan';
 import {
   generateArchitecturalFloorPlan,
@@ -42,133 +56,259 @@ const INITIAL_BLUEPRINT_DEVICES: MappedFloorDevice[] = [
   {
     id: 'DEV-FACP-01',
     type: 'panel',
-    label: 'Main FACP (Ziton ZP3)',
+    label: 'Main FACP (Ziton ZP3 Master Panel)',
     xPercent: 12,
     yPercent: 78,
     zone: 'Zone 1 - Main Entrance',
     lastServicedDate: '2026-08-15',
-    status: 'operational'
+    status: 'operational',
+    loopNumber: 1,
+    addressNumber: 1,
+    modelNumber: 'Ziton ZP3-2L',
+    serialNumber: 'SN-ZP3-2023-991',
+    batteryPercent: 98,
+    loopVoltage: 24.2,
+    signalMargin: 99
   },
   {
     id: 'DEV-MCP-01',
     type: 'call_point',
-    label: 'MCP #01 (Break Glass)',
+    label: 'MCP #01 (Break Glass Egress)',
     xPercent: 16,
     yPercent: 74,
     zone: 'Zone 1 - Main Entrance',
     lastServicedDate: '2026-08-15',
-    status: 'operational'
+    status: 'operational',
+    loopNumber: 1,
+    addressNumber: 5,
+    modelNumber: 'KAC EN54-11 Red MCP',
+    serialNumber: 'SN-KAC-44102',
+    batteryPercent: 100,
+    loopVoltage: 23.8,
+    signalMargin: 97
   },
   {
     id: 'DEV-OPT-01',
     type: 'smoke',
-    label: 'Optical Smoke #101',
+    label: 'Optical Smoke #101 (Boardroom)',
     xPercent: 28,
     yPercent: 35,
     zone: 'Zone 1 - Executive Boardroom',
     lastServicedDate: '2026-06-10',
-    status: 'due_service'
+    status: 'due_service',
+    loopNumber: 1,
+    addressNumber: 14,
+    modelNumber: 'Apollo Discovery Optical',
+    serialNumber: 'SN-AP-88120',
+    contaminationPercent: 24,
+    batteryPercent: 94,
+    loopVoltage: 22.4,
+    signalMargin: 91
   },
   {
     id: 'DEV-OPT-02',
     type: 'smoke',
-    label: 'Optical Smoke #102',
+    label: 'Optical Smoke #102 (Workstations)',
     xPercent: 55,
     yPercent: 30,
     zone: 'Zone 2 - Open Plan Workstations',
     lastServicedDate: '2026-08-20',
-    status: 'operational'
+    status: 'operational',
+    loopNumber: 1,
+    addressNumber: 22,
+    modelNumber: 'Apollo Discovery Optical',
+    serialNumber: 'SN-AP-88125',
+    contaminationPercent: 12,
+    batteryPercent: 97,
+    loopVoltage: 23.1,
+    signalMargin: 96
   },
   {
     id: 'DEV-SND-01',
     type: 'sounder',
-    label: 'Sounder / Beacon #01',
+    label: 'Sounder / Beacon #01 (Central)',
     xPercent: 50,
     yPercent: 18,
     zone: 'Zone 2 - Central Corridor',
     lastServicedDate: '2026-08-20',
-    status: 'operational'
+    status: 'operational',
+    loopNumber: 1,
+    addressNumber: 30,
+    modelNumber: 'Vantage Multi-Tone Beacon',
+    serialNumber: 'SN-VNT-10992',
+    batteryPercent: 96,
+    loopVoltage: 23.0,
+    signalMargin: 98
   },
   {
     id: 'DEV-HEAT-01',
     type: 'heat',
-    label: 'Rate-of-Rise Heat #201',
+    label: 'Rate-of-Rise Heat #201 (Server UPS)',
     xPercent: 82,
     yPercent: 28,
     zone: 'Zone 3 - Server Room & UPS Hub',
     lastServicedDate: '2026-08-28',
-    status: 'operational'
+    status: 'operational',
+    loopNumber: 2,
+    addressNumber: 4,
+    modelNumber: 'Apollo Discovery Heat A1R',
+    serialNumber: 'SN-AP-99014',
+    contaminationPercent: 8,
+    batteryPercent: 99,
+    loopVoltage: 23.6,
+    signalMargin: 98
   },
   {
     id: 'DEV-OPT-03',
     type: 'smoke',
-    label: 'Optical Smoke #202',
+    label: 'Optical Smoke #202 (Plant Room)',
     xPercent: 82,
     yPercent: 70,
     zone: 'Zone 4 - Electrical Plant Room',
     lastServicedDate: '2026-05-12',
-    status: 'fault'
+    status: 'fault',
+    loopNumber: 2,
+    addressNumber: 18,
+    modelNumber: 'Apollo Discovery Optical',
+    serialNumber: 'SN-AP-99032',
+    contaminationPercent: 41,
+    faultDescription: 'Chamber Contamination Obscuration > 35% - SANS Calibrate Required',
+    batteryPercent: 82,
+    loopVoltage: 21.2,
+    signalMargin: 64
   },
   {
     id: 'DEV-MCP-02',
     type: 'call_point',
-    label: 'MCP #02 (Emergency Egress)',
+    label: 'MCP #02 (Emergency Egress Stairwell)',
     xPercent: 88,
     yPercent: 85,
     zone: 'Zone 4 - Fire Escape Stairwell',
     lastServicedDate: '2026-08-15',
-    status: 'operational'
+    status: 'operational',
+    loopNumber: 2,
+    addressNumber: 28,
+    modelNumber: 'KAC EN54-11 Red MCP',
+    serialNumber: 'SN-KAC-44118',
+    batteryPercent: 100,
+    loopVoltage: 23.9,
+    signalMargin: 97
   }
 ];
 
 export const FloorPlanBlueprintViewer: React.FC = () => {
   const { serviceRequests, showToast } = useApp();
-  const [selectedRequestId, setSelectedRequestId] = useState<string>(
-    serviceRequests.length > 0 ? serviceRequests[0].id : ''
+
+  // Active client site selection
+  const [selectedSiteId, setSelectedSiteId] = useState<string>(
+    CLIENT_SITE_MAINTENANCE_PROFILES[0]?.siteId || 'site-01'
   );
 
-  const selectedRequest = serviceRequests.find(r => r.id === selectedRequestId);
+  const activeSiteProfile = useMemo(() => {
+    return (
+      CLIENT_SITE_MAINTENANCE_PROFILES.find((s) => s.siteId === selectedSiteId) ||
+      CLIENT_SITE_MAINTENANCE_PROFILES[0]
+    );
+  }, [selectedSiteId]);
 
-  // Active Floor Plan Model (defaults to Commercial Office)
+  // Active Floor Plan Model
   const [activePlan, setActivePlan] = useState<GeneratedFloorPlan>(() => {
     return generateArchitecturalFloorPlan({
-      siteReference: selectedRequest?.referenceNumber || 'AFE-SITE-2026',
-      customerName: selectedRequest?.customerName || 'Sandton Executive Office Park',
-      facilityName: selectedRequest?.facilityName || 'Corporate Headquarters',
-      archetype: 'commercial_office',
+      siteReference: activeSiteProfile.siteId.toUpperCase(),
+      customerName: activeSiteProfile.clientOrganisation,
+      facilityName: activeSiteProfile.siteName,
+      archetype:
+        activeSiteProfile.siteId === 'site-01'
+          ? 'industrial_warehouse'
+          : activeSiteProfile.siteId === 'site-02'
+          ? 'healthcare_clinic'
+          : 'commercial_office',
       theme: 'blueprint_blue',
       sansCategory: 'L1',
-      squareMeters: 1250,
+      squareMeters: 1450,
       zoneCount: 4,
-      ceilingHeight: 2.8,
+      ceilingHeight: 3.2,
       hasCleanAgentGasRoom: true,
-      hasLithiumBatteryRoom: false,
+      hasLithiumBatteryRoom: true,
       hasKitchenExtraction: false,
       hasEmergencyGenset: true
     });
   });
 
+  // Interactive Device overlay state
   const [devices, setDevices] = useState<MappedFloorDevice[]>(INITIAL_BLUEPRINT_DEVICES);
   const [selectedDevice, setSelectedDevice] = useState<MappedFloorDevice | null>(null);
   const [isPinModeActive, setIsPinModeActive] = useState(false);
-  const [selectedDeviceTypeToPlace, setSelectedDeviceTypeToPlace] = useState<'smoke' | 'heat' | 'call_point' | 'sounder' | 'panel'>('smoke');
+  const [selectedDeviceTypeToPlace, setSelectedDeviceTypeToPlace] =
+    useState<MappedFloorDevice['type']>('smoke');
   const [activeFloorLevel, setActiveFloorLevel] = useState<'ground' | 'first' | 'basement'>('ground');
+
+  // Interactive site-map overlay settings
+  const [overlayEngine, setOverlayEngine] = useState<'svg' | 'canvas' | 'hybrid'>('hybrid');
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'operational' | 'due_service' | 'fault' | 'testing' | 'alarm'
+  >('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'smoke' | 'heat' | 'call_point' | 'sounder' | 'panel'>('all');
   const [activeZoneFilter, setActiveZoneFilter] = useState<string>('all');
+  const [showCoverageRadius, setShowCoverageRadius] = useState(true);
+  const [showCoverageHeatmap, setShowCoverageHeatmap] = useState(false);
+
+  // Fire drill simulation state
+  const [isAlarmDrillActive, setIsAlarmDrillActive] = useState(false);
+  const [alarmSimulatingDeviceId, setAlarmSimulatingDeviceId] = useState<string | null>(null);
+
+  // Zoom & Pan
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Generator Modal state
   const [isGeneratorModalOpen, setIsGeneratorModalOpen] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
-  const [showCoverageRadius, setShowCoverageRadius] = useState(false);
 
-  const svgContainerRef = useRef<HTMLDivElement>(null);
-  const svgElementRef = useRef<SVGSVGElement>(null);
+  const svgElementRef = useRef<SVGSVGElement | null>(null);
+
+  // Switch site profile and update floor plan
+  const handleSelectSite = (siteId: string) => {
+    setSelectedSiteId(siteId);
+    const site = CLIENT_SITE_MAINTENANCE_PROFILES.find((s) => s.siteId === siteId);
+    if (!site) return;
+
+    let targetArchetype: BuildingArchetype = 'commercial_office';
+    if (site.siteId === 'site-01') targetArchetype = 'industrial_warehouse';
+    else if (site.siteId === 'site-02') targetArchetype = 'healthcare_clinic';
+    else if (site.siteId === 'site-04') targetArchetype = 'data_center';
+    else if (site.siteId === 'site-05') targetArchetype = 'retail_commercial';
+
+    const newPlan = generateArchitecturalFloorPlan({
+      siteReference: site.siteId.toUpperCase(),
+      customerName: site.clientOrganisation,
+      facilityName: site.siteName,
+      archetype: targetArchetype,
+      theme: activePlan.theme || 'blueprint_blue',
+      sansCategory: site.systemCategory.includes('P1') ? 'P1' : 'L1',
+      squareMeters: targetArchetype === 'industrial_warehouse' ? 3800 : 1600,
+      zoneCount: 4,
+      ceilingHeight: targetArchetype === 'industrial_warehouse' ? 8.5 : 3.0,
+      hasCleanAgentGasRoom: true,
+      hasLithiumBatteryRoom: targetArchetype === 'industrial_warehouse' || targetArchetype === 'data_center',
+      hasKitchenExtraction: targetArchetype === 'retail_commercial',
+      hasEmergencyGenset: true
+    });
+
+    setActivePlan(newPlan);
+    setDevices(newPlan.suggestedDevices);
+    setSelectedDevice(null);
+    setAlarmSimulatingDeviceId(null);
+    setIsAlarmDrillActive(false);
+    showToast('info', 'Site Floorplan Loaded', `Loaded ${site.siteName} (${targetArchetype.replace('_', ' ')})`);
+  };
 
   // Quick Archetype switcher
   const handleQuickSwitchArchetype = (arch: BuildingArchetype) => {
     const newPlan = generateArchitecturalFloorPlan({
-      siteReference: selectedRequest?.referenceNumber || 'AFE-SITE-2026',
-      customerName: selectedRequest?.customerName || 'Commercial Site',
-      facilityName: selectedRequest?.facilityName || 'Main Facility',
+      siteReference: activeSiteProfile.siteId.toUpperCase(),
+      customerName: activeSiteProfile.clientOrganisation,
+      facilityName: activeSiteProfile.siteName,
       archetype: arch,
       theme: activePlan.theme || 'blueprint_blue',
       sansCategory: activePlan.sansCategory || 'L1',
@@ -182,7 +322,8 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
     });
     setActivePlan(newPlan);
     setDevices(newPlan.suggestedDevices);
-    showToast('info', 'Switched Blueprint Archetype', `Loaded ${newPlan.title} (${newPlan.rooms.length} zoned spaces).`);
+    setSelectedDevice(null);
+    showToast('info', 'Blueprint Updated', `Loaded ${newPlan.title} (${newPlan.rooms.length} zones).`);
   };
 
   const handleApplyGeneratedPlan = (plan: GeneratedFloorPlan) => {
@@ -191,12 +332,121 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
     setSelectedDevice(null);
   };
 
+  // Device placement on floorplan
+  const handlePlaceDevice = (xPercent: number, yPercent: number) => {
+    const newId = `DEV-PIN-${Math.floor(100 + Math.random() * 900)}`;
+    const typeNames: Record<string, string> = {
+      smoke: 'Optical Smoke Detector',
+      heat: 'Heat / Thermal Detector',
+      call_point: 'Manual Call Point',
+      sounder: 'Alarm Sounder / Strobe',
+      panel: 'Repeater / Sub-Panel'
+    };
+
+    // Calculate room & zone
+    const canvasX = (xPercent / 100) * 1000;
+    const canvasY = (yPercent / 100) * 562;
+    const matchedRoom = activePlan.rooms.find(
+      (r) =>
+        canvasX >= r.x &&
+        canvasX <= r.x + r.width &&
+        canvasY >= r.y &&
+        canvasY <= r.y + r.height
+    );
+
+    const assignedZone = matchedRoom ? matchedRoom.zoneName : 'Zone 1 - Main Perimeter';
+
+    const newDevice: MappedFloorDevice = {
+      id: newId,
+      type: selectedDeviceTypeToPlace,
+      label: `${typeNames[selectedDeviceTypeToPlace]} #${newId.replace('DEV-PIN-', '')}`,
+      xPercent,
+      yPercent,
+      zone: assignedZone,
+      lastServicedDate: new Date().toISOString().split('T')[0],
+      status: 'operational',
+      loopNumber: 1,
+      addressNumber: devices.length + 1,
+      batteryPercent: 100,
+      loopVoltage: 23.8,
+      signalMargin: 98,
+      contaminationPercent: 10
+    };
+
+    setDevices((prev) => [...prev, newDevice]);
+    setSelectedDevice(newDevice);
+    setIsPinModeActive(false);
+    showToast('success', 'Device Plotted', `Placed ${newDevice.label} in ${assignedZone} at (${xPercent}%, ${yPercent}%).`);
+  };
+
+  const handleUpdateDevice = (updated: MappedFloorDevice) => {
+    setDevices((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    if (selectedDevice?.id === updated.id) {
+      setSelectedDevice(updated);
+    }
+  };
+
+  const handleDeleteDevice = (id: string) => {
+    setDevices((prev) => prev.filter((d) => d.id !== id));
+    if (selectedDevice?.id === id) setSelectedDevice(null);
+    if (alarmSimulatingDeviceId === id) {
+      setAlarmSimulatingDeviceId(null);
+      setIsAlarmDrillActive(false);
+    }
+    showToast('info', 'Pin Removed', `Removed device ${id} from floor schematic.`);
+  };
+
+  // Quick Status Actions from Device Inspector
+  const handleSetDeviceStatus = (status: MappedFloorDevice['status'], note?: string) => {
+    if (!selectedDevice) return;
+    const updated: MappedFloorDevice = {
+      ...selectedDevice,
+      status,
+      lastServicedDate: status === 'operational' ? new Date().toISOString().split('T')[0] : selectedDevice.lastServicedDate,
+      contaminationPercent: status === 'operational' ? 12 : status === 'fault' ? 42 : selectedDevice.contaminationPercent,
+      faultDescription: status === 'fault' ? note || 'High chamber obscuration / optical scatter error' : undefined
+    };
+    handleUpdateDevice(updated);
+    showToast(
+      status === 'operational' ? 'success' : status === 'fault' ? 'error' : 'info',
+      'Device Status Updated',
+      `${selectedDevice.id} set to ${status.toUpperCase().replace('_', ' ')}.`
+    );
+  };
+
+  // Fire Drill / Alarm Simulation trigger
+  const handleToggleAlarmDrill = () => {
+    if (isAlarmDrillActive) {
+      setIsAlarmDrillActive(false);
+      setAlarmSimulatingDeviceId(null);
+      showToast('info', 'Fire Drill Reset', 'Fire alarm system restored to normal standby mode.');
+    } else {
+      // Pick selected device or first MCP/smoke detector to trip
+      const triggerDevice =
+        selectedDevice ||
+        devices.find((d) => d.type === 'call_point') ||
+        devices.find((d) => d.type === 'smoke') ||
+        devices[0];
+
+      if (triggerDevice) {
+        setIsAlarmDrillActive(true);
+        setAlarmSimulatingDeviceId(triggerDevice.id);
+        setSelectedDevice(triggerDevice);
+        showToast(
+          'error',
+          '🔥 SANS 10139 ALARM SIMULATION ACTIVE',
+          `Alarm triggered at ${triggerDevice.id} (${triggerDevice.label}). Sounders and egress routes active!`
+        );
+      }
+    }
+  };
+
   const handleExportPngImage = async () => {
     if (!svgElementRef.current) return;
     setIsExportingPng(true);
     try {
-      showToast('info', 'Rendering High-Res PNG', 'Generating 2000x1124 CAD blueprint image...');
-      const filename = `FloorPlan_${activePlan.archetype}_${selectedRequest?.referenceNumber || 'AFE'}.png`;
+      showToast('info', 'Rendering High-Res PNG', 'Generating 2000x1124 CAD blueprint with device status overlay...');
+      const filename = `FloorPlan_SiteMap_${activePlan.archetype}_${activeSiteProfile.siteId.toUpperCase()}.png`;
       await exportSvgToPng(svgElementRef.current, filename);
       showToast('success', 'Image Downloaded', `Saved ${filename}`);
     } catch (err) {
@@ -207,69 +457,12 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
     }
   };
 
-  const handleSvgClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isPinModeActive || !svgContainerRef.current) return;
-
-    const rect = svgContainerRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const clickY = e.clientY - rect.top;
-
-    const xPercent = Math.round((clickX / rect.width) * 100);
-    const yPercent = Math.round((clickY / rect.height) * 100);
-
-    // Determine zone from rooms if possible
-    const clickCanvasX = (xPercent / 100) * 1000;
-    const clickCanvasY = (yPercent / 100) * 562;
-    const matchedRoom = activePlan.rooms.find(
-      r =>
-        clickCanvasX >= r.x &&
-        clickCanvasX <= r.x + r.width &&
-        clickCanvasY >= r.y &&
-        clickCanvasY <= r.y + r.height
-    );
-
-    let assignedZone = matchedRoom ? matchedRoom.zoneName : 'Zone 1 - Monitored Perimeter';
-
-    const newId = `DEV-PIN-${Math.floor(100 + Math.random() * 900)}`;
-    const typeNames: Record<string, string> = {
-      smoke: 'Optical Smoke Detector',
-      heat: 'Heat / Thermal Detector',
-      call_point: 'Manual Call Point',
-      sounder: 'Alarm Sounder / Strobe',
-      panel: 'Repeater / Sub-Panel'
-    };
-
-    const newDevice: MappedFloorDevice = {
-      id: newId,
-      type: selectedDeviceTypeToPlace,
-      label: `${typeNames[selectedDeviceTypeToPlace]} #${newId.replace('DEV-PIN-', '')}`,
-      xPercent,
-      yPercent,
-      zone: assignedZone,
-      lastServicedDate: new Date().toISOString().split('T')[0],
-      status: 'operational'
-    };
-
-    setDevices(prev => [...prev, newDevice]);
-    setSelectedDevice(newDevice);
-    setIsPinModeActive(false);
-    showToast(
-      'success',
-      'Device Mapped on Blueprint',
-      `Placed ${newDevice.label} at (${xPercent}%, ${yPercent}%) in ${assignedZone}.`
-    );
-  };
-
-  const handleDeleteDevice = (id: string) => {
-    setDevices(prev => prev.filter(d => d.id !== id));
-    if (selectedDevice?.id === id) setSelectedDevice(null);
-    showToast('info', 'Pin Removed', `Removed device ${id} from floor schematic.`);
-  };
-
   const handleExportBlueprintData = () => {
     const dataStr = JSON.stringify(
       {
-        siteReference: selectedRequest?.referenceNumber || activePlan.siteReference,
+        siteId: activeSiteProfile.siteId,
+        siteName: activeSiteProfile.siteName,
+        customer: activeSiteProfile.clientOrganisation,
         facilityTitle: activePlan.title,
         archetype: activePlan.archetype,
         floorLevel: activeFloorLevel,
@@ -286,52 +479,93 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `FloorPlan_${activePlan.archetype}_${selectedRequest?.referenceNumber || 'AFE'}.json`;
+    link.download = `SANS_SiteMap_${activePlan.archetype}_${activeSiteProfile.siteId}.json`;
     link.click();
     URL.revokeObjectURL(url);
-    showToast('success', 'Export Complete', 'Floor plan device mapping JSON exported successfully.');
+    showToast('success', 'Export Complete', 'Floor plan site-map device schedule exported.');
   };
 
-  const filteredDevices = devices.filter(dev => {
-    if (activeZoneFilter === 'all') return true;
-    return dev.zone.toLowerCase().includes(activeZoneFilter.toLowerCase());
-  });
-
-  const currentTheme = BLUEPRINT_THEMES[activePlan.theme] || BLUEPRINT_THEMES.blueprint_blue;
+  // Device stats counts
+  const deviceStats = useMemo(() => {
+    return {
+      total: devices.length,
+      operational: devices.filter((d) => d.status === 'operational').length,
+      due: devices.filter((d) => d.status === 'due_service').length,
+      fault: devices.filter((d) => d.status === 'fault').length,
+      testing: devices.filter((d) => d.status === 'testing').length,
+      smokes: devices.filter((d) => d.type === 'smoke').length,
+      heats: devices.filter((d) => d.type === 'heat').length,
+      mcps: devices.filter((d) => d.type === 'call_point').length,
+      sounders: devices.filter((d) => d.type === 'sounder').length,
+      panels: devices.filter((d) => d.type === 'panel').length
+    };
+  }, [devices]);
 
   return (
-    <div className="bg-[#0A192F] border border-slate-800 rounded-2xl p-5 sm:p-6 text-white space-y-5 shadow-xl">
-      {/* Top Header & Service Request Association */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+    <div className="bg-[#0A192F] border border-slate-800 rounded-2xl p-5 sm:p-6 text-white space-y-5 shadow-2xl">
+      {/* Top Header & Site Selection */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-800 pb-5">
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-950 text-amber-300 border border-amber-800 uppercase tracking-wider">
-              SANS 10139 CAD Floor Plan Mapping
+              SANS 10139 CAD SITE-MAP OVERLAY
             </span>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-950 text-blue-300 border border-blue-800 uppercase tracking-wider">
-              {activePlan.archetype.replace('_', ' ')}
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800 uppercase tracking-wider flex items-center gap-1">
+              <Layers className="w-3 h-3" />
+              <span>{overlayEngine.toUpperCase()} OVERLAY</span>
             </span>
             <span className="text-slate-400 text-xs font-mono">
-              Placeholder Architectural Schematic Generator
+              Live Device Location &amp; Telemetry Status Plotter
             </span>
           </div>
-          <h3 className="text-lg font-bold text-white mt-1">
-            {activePlan.title}
-          </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Interactive CAD blueprint layout for new service requests and facilities lacking architectural drawings.
+
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className="text-xl font-black text-white tracking-tight">
+              {activePlan.title}
+            </h3>
+
+            {/* Site selector dropdown */}
+            <select
+              value={selectedSiteId}
+              onChange={(e) => handleSelectSite(e.target.value)}
+              className="px-2.5 py-1 text-xs rounded-lg border border-slate-700 bg-slate-900 text-cyan-300 font-mono font-bold"
+            >
+              {CLIENT_SITE_MAINTENANCE_PROFILES.map((site) => (
+                <option key={site.siteId} value={site.siteId}>
+                  {site.siteName} ({site.city})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <p className="text-xs text-slate-400 mt-1">
+            Interactive CAD site-map overlay with real-time sensor radar, live drag-and-drop plotting, SANS 10139 7.5m coverage radiuses, and alarm simulation.
           </p>
         </div>
 
-        {/* Action Controls: Generate Blueprint Modal, Download Image, Export JSON */}
+        {/* Action Controls: Fire Drill, Generate, Download PNG, Export JSON */}
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Fire Drill Simulation Button */}
+          <button
+            type="button"
+            onClick={handleToggleAlarmDrill}
+            className={`px-3.5 py-2 rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-lg ${
+              isAlarmDrillActive
+                ? 'bg-rose-600 hover:bg-rose-500 text-white ring-2 ring-rose-400 animate-pulse'
+                : 'bg-gradient-to-r from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 text-white'
+            }`}
+          >
+            {isAlarmDrillActive ? <RotateCcw className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+            <span>{isAlarmDrillActive ? 'Reset Fire Drill' : 'Simulate Fire Drill'}</span>
+          </button>
+
           <button
             type="button"
             onClick={() => setIsGeneratorModalOpen(true)}
-            className="px-3.5 py-2 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+            className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg text-xs font-mono font-bold flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
           >
             <Sparkles className="w-4 h-4" />
-            <span>Generate Floor Plan</span>
+            <span>Generate Plan</span>
           </button>
 
           <button
@@ -356,80 +590,59 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Archetype Switcher Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 p-2.5 rounded-xl">
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mr-1">
-            Archetypes:
-          </span>
+      {/* Alarm Simulation Alert Banner (when drill is running) */}
+      {isAlarmDrillActive && (
+        <div className="bg-rose-950/80 border border-rose-600/80 rounded-xl p-3 px-4 flex items-center justify-between gap-4 text-white animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-rose-600 flex items-center justify-center text-white shrink-0">
+              <Volume2 className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-mono font-bold text-xs text-rose-300 uppercase tracking-wider">
+                SANS 10139 EVACUATION DRILL ACTIVE
+              </div>
+              <div className="text-xs text-white">
+                Alarm transmission simulated at <strong>{alarmSimulatingDeviceId}</strong>. Connected sounders strobing and emergency egress paths highlighted green.
+              </div>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={() => handleQuickSwitchArchetype('commercial_office')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activePlan.archetype === 'commercial_office'
-                ? 'bg-blue-600 text-white font-bold'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white'
-            }`}
+            onClick={handleToggleAlarmDrill}
+            className="px-3 py-1 rounded bg-rose-800 hover:bg-rose-700 text-white font-mono text-xs font-bold shrink-0 cursor-pointer"
           >
-            <Building2 className="w-3 h-3" />
-            <span>Office</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickSwitchArchetype('industrial_warehouse')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activePlan.archetype === 'industrial_warehouse'
-                ? 'bg-amber-600 text-white font-bold'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Boxes className="w-3 h-3" />
-            <span>Warehouse</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickSwitchArchetype('healthcare_clinic')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activePlan.archetype === 'healthcare_clinic'
-                ? 'bg-emerald-600 text-white font-bold'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Stethoscope className="w-3 h-3" />
-            <span>Hospital Clinic</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickSwitchArchetype('data_center')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activePlan.archetype === 'data_center'
-                ? 'bg-rose-600 text-white font-bold'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Server className="w-3 h-3" />
-            <span>Data Center</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickSwitchArchetype('retail_commercial')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors flex items-center gap-1.5 cursor-pointer ${
-              activePlan.archetype === 'retail_commercial'
-                ? 'bg-purple-600 text-white font-bold'
-                : 'bg-slate-800/80 text-slate-400 hover:text-white'
-            }`}
-          >
-            <ShoppingBag className="w-3 h-3" />
-            <span>Retail Mall</span>
+            Silence / Reset FACP
           </button>
         </div>
+      )}
 
-        {/* Radius toggle */}
+      {/* Control Bar: Overlay Engine, Layer Filters, Coverage Toggles, Zoom */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-800 p-3 rounded-xl">
+        {/* Overlay Engine Switcher */}
         <div className="flex items-center gap-2">
+          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">
+            Overlay:
+          </span>
+          <div className="flex items-center bg-slate-950 p-0.5 rounded-lg border border-slate-800">
+            {(['hybrid', 'svg', 'canvas'] as const).map((eng) => (
+              <button
+                key={eng}
+                type="button"
+                onClick={() => setOverlayEngine(eng)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-bold uppercase transition-all cursor-pointer ${
+                  overlayEngine === eng
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {eng === 'hybrid' ? 'Hybrid Sync' : eng}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Coverage Radiuses & Heatmap Toggles */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={() => setShowCoverageRadius(!showCoverageRadius)}
@@ -441,42 +654,66 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
           >
             7.5m Smoke Radiuses: {showCoverageRadius ? 'ON' : 'OFF'}
           </button>
-        </div>
-      </div>
 
-      {/* Control Bar: Floor Selection, Pin Placement Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 p-3 rounded-xl">
-        {/* Floor Level Tabs */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-mono text-slate-400 mr-2">Level:</span>
-          {(['ground', 'first', 'basement'] as const).map((level) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => setActiveFloorLevel(level)}
-              className={`px-3 py-1 rounded-md text-xs font-mono font-bold capitalize transition-all cursor-pointer ${
-                activeFloorLevel === level
-                  ? 'bg-[#CC0000] text-white shadow-xs'
-                  : 'bg-slate-800 text-slate-400 hover:text-white'
-              }`}
-            >
-              {level} Floor
-            </button>
-          ))}
+          <button
+            type="button"
+            onClick={() => setShowCoverageHeatmap(!showCoverageHeatmap)}
+            className={`px-2.5 py-1 text-[11px] font-mono rounded-md border transition-colors cursor-pointer ${
+              showCoverageHeatmap
+                ? 'bg-purple-950 text-purple-300 border-purple-700'
+                : 'bg-slate-800 text-slate-400 border-slate-700'
+            }`}
+          >
+            Density Heatmap: {showCoverageHeatmap ? 'ON' : 'OFF'}
+          </button>
         </div>
 
-        {/* Pinning Action Mode */}
+        {/* Zoom & Pan Controls */}
+        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <button
+            type="button"
+            onClick={() => setZoomLevel((z) => Math.min(2.5, +(z + 0.25).toFixed(2)))}
+            className="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <span className="px-1.5 text-[10px] font-mono text-cyan-400 font-bold min-w-[36px] text-center">
+            {Math.round(zoomLevel * 100)}%
+          </span>
+          <button
+            type="button"
+            onClick={() => setZoomLevel((z) => Math.max(0.75, +(z - 0.25).toFixed(2)))}
+            className="p-1 text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setZoomLevel(1);
+              setPanOffset({ x: 0, y: 0 });
+            }}
+            className="px-2 py-0.5 text-[10px] font-mono text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
+            title="Reset Zoom & Pan"
+          >
+            Reset
+          </button>
+        </div>
+
+        {/* Pin Placement Mode */}
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={selectedDeviceTypeToPlace}
             onChange={(e) => setSelectedDeviceTypeToPlace(e.target.value as any)}
-            className="px-2.5 py-1 text-xs rounded-md border border-slate-700 bg-slate-800 text-slate-200 font-mono"
+            className="px-2 py-1 text-xs rounded-md border border-slate-700 bg-slate-800 text-slate-200 font-mono"
           >
             <option value="smoke">Optical Smoke (SANS Cl. 25.3.3)</option>
             <option value="heat">Heat Detector (Thermal)</option>
-            <option value="call_point">Manual Call Point (Break Glass)</option>
+            <option value="call_point">Manual Call Point (MCP)</option>
             <option value="sounder">Sounder / Strobe Beacon</option>
-            <option value="panel">Repeater / Sub-Panel</option>
+            <option value="panel">Control Repeater / Panel</option>
           </select>
 
           <button
@@ -489,277 +726,141 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
             }`}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{isPinModeActive ? 'Click on Plan to Place' : 'Place Device Pin'}</span>
+            <span>{isPinModeActive ? 'Click Plan to Drop' : 'Place Pin'}</span>
           </button>
         </div>
       </div>
 
-      {/* Blueprint Canvas / Technical SVG Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Main Floor Plan SVG Canvas */}
-        <div className="lg:col-span-3 bg-[#071322] border border-blue-900/50 rounded-xl overflow-hidden relative shadow-2xl">
-          {/* Blueprint Grid Watermark & Legend */}
-          <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-950/90 text-blue-300 border border-blue-800">
-              CAD SCALE 1:100 | SANS 10139 SCHEMATIC
-            </span>
-            {isPinModeActive && (
-              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 animate-bounce">
-                READY: CLICK ANY ROOM TO DROP PIN
-              </span>
-            )}
-          </div>
-
-          <div
-            ref={svgContainerRef}
-            onClick={handleSvgClick}
-            className={`relative w-full aspect-16/9 overflow-hidden ${
-              isPinModeActive ? 'cursor-crosshair' : 'cursor-default'
-            }`}
-          >
-            {/* Technical SVG Floor Plan Illustration */}
-            <svg
-              ref={svgElementRef}
-              viewBox="0 0 1000 562"
-              className="w-full h-full select-none"
-              xmlns="http://www.w3.org/2000/svg"
+      {/* Filter Bar: Status Filters, Type Filters, Floor Level */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 border border-slate-800/80 p-2.5 rounded-xl">
+        {/* Status Filter Pills */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mr-1">
+            Status:
+          </span>
+          {[
+            { id: 'all', label: `All (${deviceStats.total})`, color: 'bg-slate-800 text-slate-300' },
+            { id: 'operational', label: `Operational (${deviceStats.operational})`, color: 'bg-emerald-950 text-emerald-300 border-emerald-800' },
+            { id: 'due_service', label: `Due (${deviceStats.due})`, color: 'bg-amber-950 text-amber-300 border-amber-800' },
+            { id: 'fault', label: `Fault (${deviceStats.fault})`, color: 'bg-rose-950 text-rose-300 border-rose-800' }
+          ].map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => setStatusFilter(f.id as any)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-colors cursor-pointer border ${
+                statusFilter === f.id
+                  ? 'bg-blue-600 text-white font-bold border-blue-500 shadow-xs'
+                  : `${f.color} hover:text-white`
+              }`}
             >
-              <defs>
-                {/* Blueprint Grid Pattern */}
-                <pattern id="cadGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-                  <path d="M 40 0 L 0 0 0 40" fill="none" stroke={currentTheme.gridPrimary} strokeWidth="0.75" />
-                  <path d="M 200 0 L 0 0 0 200" fill="none" stroke={currentTheme.gridSecondary} strokeWidth="1.2" opacity="0.3" />
-                </pattern>
-
-                <pattern id="viewerHazardHatch" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-                  <line x1="0" y1="0" x2="0" y2="10" stroke={currentTheme.hazardBorder} strokeWidth="1" opacity="0.4" />
-                </pattern>
-              </defs>
-
-              {/* Blueprint Canvas Background */}
-              <rect width="1000" height="562" fill={currentTheme.bg} />
-              <rect width="1000" height="562" fill="url(#cadGrid)" />
-
-              {/* Building Outer Perimeter Walls */}
-              <rect
-                x="60"
-                y="50"
-                width="880"
-                height="460"
-                fill="none"
-                stroke={currentTheme.wallExterior}
-                strokeWidth="4"
-                strokeLinejoin="miter"
-              />
-
-              {/* Dynamically Rendered Rooms from Architectural Floor Plan */}
-              {activePlan.rooms.map((room, idx) => {
-                const isHazard = room.type === 'hazard' || room.type === 'server_room';
-                const roomFill = isHazard
-                  ? currentTheme.hazardBg
-                  : idx % 2 === 0
-                  ? currentTheme.roomBg
-                  : currentTheme.roomBgAlt;
-
-                return (
-                  <g key={room.id}>
-                    <rect
-                      x={room.x}
-                      y={room.y}
-                      width={room.width}
-                      height={room.height}
-                      fill={roomFill}
-                      stroke={isHazard ? currentTheme.hazardBorder : currentTheme.wallInterior}
-                      strokeWidth="2"
-                    />
-
-                    {isHazard && (
-                      <rect
-                        x={room.x}
-                        y={room.y}
-                        width={room.width}
-                        height={room.height}
-                        fill="url(#viewerHazardHatch)"
-                        opacity="0.5"
-                      />
-                    )}
-
-                    <text
-                      x={room.x + 14}
-                      y={room.y + 24}
-                      fill={currentTheme.textPrimary}
-                      fontSize="11"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      {room.name}
-                    </text>
-
-                    <text
-                      x={room.x + 14}
-                      y={room.y + 40}
-                      fill={currentTheme.textMuted}
-                      fontSize="9"
-                      fontFamily="monospace"
-                    >
-                      {room.areaSqM} m² | {room.zoneName}
-                    </text>
-
-                    {room.specialHazard && (
-                      <text
-                        x={room.x + 14}
-                        y={room.y + room.height - 14}
-                        fill={currentTheme.hazardBorder}
-                        fontSize="9"
-                        fontFamily="monospace"
-                        fontWeight="bold"
-                      >
-                        ⚠ [{room.specialHazard}]
-                      </text>
-                    )}
-                  </g>
-                );
-              })}
-
-              {/* Doors & Fire Egress */}
-              {activePlan.doors.map((door) => {
-                const doorStroke = door.isEmergencyExit
-                  ? currentTheme.doorExit
-                  : currentTheme.doorNormal;
-
-                return (
-                  <g key={door.id}>
-                    {door.orientation === 'vertical' ? (
-                      <line
-                        x1={door.x}
-                        y1={door.y}
-                        x2={door.x}
-                        y2={door.y + door.width}
-                        stroke={doorStroke}
-                        strokeWidth="6"
-                      />
-                    ) : (
-                      <line
-                        x1={door.x}
-                        y1={door.y}
-                        x2={door.x + door.width}
-                        y2={door.y}
-                        stroke={doorStroke}
-                        strokeWidth="6"
-                      />
-                    )}
-                    <text
-                      x={door.x > 800 ? door.x - 70 : door.x + 10}
-                      y={door.y + 15}
-                      fill={doorStroke}
-                      fontSize="10"
-                      fontFamily="monospace"
-                      fontWeight="bold"
-                    >
-                      {door.label}
-                    </text>
-                  </g>
-                );
-              })}
-
-              {/* SANS 7.5m Detector Coverage Circles */}
-              {showCoverageRadius &&
-                filteredDevices
-                  .filter((d) => d.type === 'smoke')
-                  .map((dev) => {
-                    const cx = (dev.xPercent / 100) * 1000;
-                    const cy = (dev.yPercent / 100) * 562;
-                    return (
-                      <circle
-                        key={`rad-${dev.id}`}
-                        cx={cx}
-                        cy={cy}
-                        r="75"
-                        fill="#38BDF8"
-                        fillOpacity="0.08"
-                        stroke="#38BDF8"
-                        strokeWidth="1"
-                        strokeDasharray="4 4"
-                        opacity="0.8"
-                      />
-                    );
-                  })}
-
-              {/* CAD Title Block */}
-              <g transform="translate(660, 430)">
-                <rect
-                  width="270"
-                  height="75"
-                  fill={currentTheme.titleBlockBg}
-                  stroke={currentTheme.titleBlockBorder}
-                  strokeWidth="1.5"
-                  opacity="0.92"
-                />
-                <text x="12" y="18" fill={currentTheme.textPrimary} fontSize="10" fontFamily="monospace" fontWeight="bold">
-                  AUDRIN FIRE ENGINEERS (PTY) LTD
-                </text>
-                <text x="12" y="32" fill={currentTheme.textSecondary} fontSize="8.5" fontFamily="monospace">
-                  REF: {selectedRequest?.referenceNumber || activePlan.siteReference}
-                </text>
-                <text x="12" y="46" fill={currentTheme.textMuted} fontSize="8" fontFamily="monospace">
-                  SANS 10139 CAT {activePlan.sansCategory} | {activePlan.squareMeters} m²
-                </text>
-                <text x="12" y="60" fill="#10B981" fontSize="8" fontFamily="monospace" fontWeight="bold">
-                  SAQCC 1475 CAD VERIFIED
-                </text>
-              </g>
-            </svg>
-
-            {/* Mapped Device Interactive Pins */}
-            {filteredDevices.map((dev) => {
-              const isSelected = selectedDevice?.id === dev.id;
-              let pinBg = 'bg-emerald-500';
-              if (dev.status === 'due_service') pinBg = 'bg-amber-500';
-              if (dev.status === 'fault') pinBg = 'bg-rose-500 animate-pulse';
-              if (dev.type === 'panel') pinBg = 'bg-purple-500';
-              if (dev.type === 'sounder') pinBg = 'bg-pink-500';
-
-              return (
-                <div
-                  key={dev.id}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedDevice(dev);
-                  }}
-                  style={{
-                    left: `${dev.xPercent}%`,
-                    top: `${dev.yPercent}%`,
-                    transform: 'translate(-50%, -50%)'
-                  }}
-                  className={`absolute z-30 flex flex-col items-center cursor-pointer group transition-transform ${
-                    isSelected ? 'scale-125 z-40' : 'hover:scale-110'
-                  }`}
-                >
-                  <div
-                    className={`w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-[10px] font-bold text-white ${pinBg}`}
-                  >
-                    {dev.type === 'smoke' && <Radio className="w-3 h-3" />}
-                    {dev.type === 'heat' && <Flame className="w-3 h-3" />}
-                    {dev.type === 'call_point' && <AlertCircle className="w-3 h-3" />}
-                    {dev.type === 'sounder' && <Bell className="w-3 h-3" />}
-                    {dev.type === 'panel' && <Cpu className="w-3 h-3" />}
-                  </div>
-
-                  {/* Micro label */}
-                  <span className="mt-1 px-1.5 py-0.2 rounded bg-slate-900/90 text-white font-mono text-[9px] border border-slate-700 whitespace-nowrap shadow-md">
-                    {dev.id}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+              {f.label}
+            </button>
+          ))}
         </div>
 
-        {/* Selected Device Inspector & Blueprint Metadata */}
+        {/* Device Type Filters */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mr-1">
+            Type:
+          </span>
+          {[
+            { id: 'all', label: 'All' },
+            { id: 'smoke', label: 'Smoke' },
+            { id: 'heat', label: 'Heat' },
+            { id: 'call_point', label: 'MCP' },
+            { id: 'sounder', label: 'Sounder' },
+            { id: 'panel', label: 'Panel' }
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTypeFilter(t.id as any)}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                typeFilter === t.id
+                  ? 'bg-cyan-600 text-white font-bold'
+                  : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Floor Level Selector */}
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-mono text-slate-400 uppercase tracking-wider mr-1">
+            Floor:
+          </span>
+          {(['ground', 'first', 'basement'] as const).map((level) => (
+            <button
+              key={level}
+              type="button"
+              onClick={() => setActiveFloorLevel(level)}
+              className={`px-2.5 py-1 rounded text-[11px] font-mono font-bold capitalize transition-colors cursor-pointer ${
+                activeFloorLevel === level
+                  ? 'bg-[#CC0000] text-white'
+                  : 'bg-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              {level}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Floor Plan Blueprint & Interactive Site-Map Overlay */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        {/* Canvas & SVG Floor Plan Viewer */}
+        <div className="lg:col-span-3 bg-[#071322] border border-blue-900/50 rounded-xl overflow-hidden relative shadow-2xl">
+          {/* Overlay Status Bar */}
+          <div className="absolute top-3 left-3 z-30 flex items-center gap-2 flex-wrap pointer-events-none">
+            <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-blue-950/90 text-blue-300 border border-blue-800 backdrop-blur-xs">
+              CAD SCALE 1:100 &bull; SANS 10139
+            </span>
+
+            {isPinModeActive && (
+              <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 animate-bounce pointer-events-auto">
+                CLICK ANY SPACE TO PLOT {selectedDeviceTypeToPlace.toUpperCase()}
+              </span>
+            )}
+
+            <span className="px-2 py-0.5 rounded text-[9px] font-mono text-slate-300 bg-slate-900/80 border border-slate-700 backdrop-blur-xs">
+              Drag pins to reposition &bull; Hover for telemetry HUD
+            </span>
+          </div>
+
+          {/* Interactive Canvas / SVG Floorplan Overlay Component */}
+          <InteractiveFloorplanOverlay
+            plan={activePlan}
+            devices={devices}
+            selectedDevice={selectedDevice}
+            onSelectDevice={setSelectedDevice}
+            onUpdateDevice={handleUpdateDevice}
+            onDeleteDevice={handleDeleteDevice}
+            isPinModeActive={isPinModeActive}
+            selectedDeviceTypeToPlace={selectedDeviceTypeToPlace}
+            onPlaceDevice={handlePlaceDevice}
+            showCoverageRadius={showCoverageRadius}
+            showCoverageHeatmap={showCoverageHeatmap}
+            overlayEngine={overlayEngine}
+            statusFilter={statusFilter}
+            typeFilter={typeFilter}
+            zoneFilter={activeZoneFilter}
+            alarmSimulatingDeviceId={alarmSimulatingDeviceId}
+            zoomLevel={zoomLevel}
+            panOffset={panOffset}
+            onPanChange={setPanOffset}
+            svgRef={svgElementRef}
+          />
+        </div>
+
+        {/* Selected Device Telemetry Inspector & Control Panel */}
         <div className="space-y-4">
           {selectedDevice ? (
-            <div className="p-4 bg-slate-900 border border-slate-700 rounded-xl space-y-3">
-              <div className="flex items-start justify-between border-b border-slate-800 pb-2">
+            <div className="p-4 bg-slate-900 border border-slate-700 rounded-xl space-y-4 shadow-xl">
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-slate-800 pb-2.5">
                 <div>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold bg-blue-950 text-blue-300 border border-blue-800">
                     {selectedDevice.type.toUpperCase()} PIN
@@ -768,7 +869,7 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
                     {selectedDevice.label}
                   </h4>
                   <div className="text-[11px] font-mono text-slate-400">
-                    ID: {selectedDevice.id}
+                    ID: {selectedDevice.id} &bull; {selectedDevice.modelNumber || 'Standard EN54 Detector'}
                   </div>
                 </div>
                 <button
@@ -781,76 +882,181 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
                 </button>
               </div>
 
-              <div className="space-y-2 text-xs font-mono">
-                <div className="flex justify-between py-1 border-b border-slate-800/80">
-                  <span className="text-slate-400">Zone Assignment:</span>
-                  <span className="text-white font-semibold text-right">{selectedDevice.zone}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/80">
-                  <span className="text-slate-400">Blueprint Coords:</span>
-                  <span className="text-slate-200">{selectedDevice.xPercent}%, {selectedDevice.yPercent}%</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/80">
-                  <span className="text-slate-400">Last Serviced:</span>
-                  <span className="text-slate-200">{selectedDevice.lastServicedDate || 'Pending Initial Check'}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/80">
-                  <span className="text-slate-400">Operational Status:</span>
+              {/* Status Indicator Pill */}
+              <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950 border border-slate-800">
+                <span className="text-xs font-mono text-slate-400">Operational Status:</span>
+                <span
+                  className={`text-xs font-mono font-bold px-2 py-0.5 rounded uppercase ${
+                    selectedDevice.status === 'operational'
+                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                      : selectedDevice.status === 'due_service'
+                      ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                      : selectedDevice.status === 'fault'
+                      ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                      : 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                  }`}
+                >
+                  {selectedDevice.status.replace('_', ' ')}
+                </span>
+              </div>
+
+              {/* Live Telemetry Gauges */}
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div className="p-2 rounded bg-slate-950 border border-slate-800 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 block">Chamber Contam</span>
                   <span
-                    className={`font-bold capitalize ${
-                      selectedDevice.status === 'operational'
-                        ? 'text-emerald-400'
-                        : selectedDevice.status === 'due_service'
+                    className={`text-base font-bold ${
+                      (selectedDevice.contaminationPercent || 10) > 30
+                        ? 'text-rose-400'
+                        : (selectedDevice.contaminationPercent || 10) > 20
                         ? 'text-amber-400'
-                        : 'text-rose-400'
+                        : 'text-emerald-400'
                     }`}
                   >
-                    {selectedDevice.status.replace('_', ' ')}
+                    {selectedDevice.contaminationPercent || 14}%
+                  </span>
+                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${
+                        (selectedDevice.contaminationPercent || 10) > 30 ? 'bg-rose-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(100, selectedDevice.contaminationPercent || 14)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="p-2 rounded bg-slate-950 border border-slate-800 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 block">Loop Voltage</span>
+                  <span className="text-base font-bold text-cyan-400">
+                    {selectedDevice.loopVoltage || 23.4}V
+                  </span>
+                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                    <div className="h-full bg-cyan-500" style={{ width: '92%' }} />
+                  </div>
+                </div>
+
+                <div className="p-2 rounded bg-slate-950 border border-slate-800 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 block">Signal Margin</span>
+                  <span className="text-base font-bold text-blue-400">
+                    {selectedDevice.signalMargin || 96}%
+                  </span>
+                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                    <div className="h-full bg-blue-500" style={{ width: `${selectedDevice.signalMargin || 96}%` }} />
+                  </div>
+                </div>
+
+                <div className="p-2 rounded bg-slate-950 border border-slate-800 space-y-0.5">
+                  <span className="text-[10px] text-slate-400 block">Battery Standby</span>
+                  <span className="text-base font-bold text-emerald-400">
+                    {selectedDevice.batteryPercent || 98}%
+                  </span>
+                  <div className="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500" style={{ width: `${selectedDevice.batteryPercent || 98}%` }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Coordinates & Zone assignment */}
+              <div className="space-y-1.5 text-xs font-mono">
+                <div className="flex justify-between py-1 border-b border-slate-800">
+                  <span className="text-slate-400">Zone Assignment:</span>
+                  <span className="text-white font-semibold text-right truncate max-w-[140px]">
+                    {selectedDevice.zone}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800">
+                  <span className="text-slate-400">Floor Coordinates:</span>
+                  <span className="text-cyan-300">
+                    ({selectedDevice.xPercent}%, {selectedDevice.yPercent}%)
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800">
+                  <span className="text-slate-400">SANS Address:</span>
+                  <span className="text-slate-200">
+                    Loop {selectedDevice.loopNumber || 1} &bull; Addr {selectedDevice.addressNumber || 12}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800">
+                  <span className="text-slate-400">Last Serviced:</span>
+                  <span className="text-slate-200">
+                    {selectedDevice.lastServicedDate || 'Pending Inspection'}
                   </span>
                 </div>
               </div>
 
-              <div className="pt-2">
-                <div className="text-[10px] text-slate-400 leading-tight">
-                  Tagged under SANS 10139 routine device registry. Changes persist in local layout schematic.
+              {/* Quick Status Modifiers */}
+              <div className="space-y-2 pt-1 border-t border-slate-800">
+                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+                  Quick SANS Status Actions:
+                </span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => handleSetDeviceStatus('operational')}
+                    className="px-2 py-1.5 bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-800 rounded text-[11px] font-mono font-bold transition-colors cursor-pointer"
+                  >
+                    &bull; Mark Tested OK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetDeviceStatus('due_service')}
+                    className="px-2 py-1.5 bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-800 rounded text-[11px] font-mono font-bold transition-colors cursor-pointer"
+                  >
+                    &bull; Flag Due Service
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetDeviceStatus('fault', 'Chamber contaminated / optical drift error')}
+                    className="px-2 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded text-[11px] font-mono font-bold transition-colors cursor-pointer"
+                  >
+                    &bull; Log Defect / Fault
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAlarmDrillActive(true);
+                      setAlarmSimulatingDeviceId(selectedDevice.id);
+                      showToast('error', 'Alarm Simulated', `Triggered alarm at ${selectedDevice.id}.`);
+                    }}
+                    className="px-2 py-1.5 bg-red-900 hover:bg-red-800 text-white rounded text-[11px] font-mono font-bold transition-colors cursor-pointer"
+                  >
+                    &bull; Simulate Trip
+                  </button>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl text-center space-y-2 py-8">
+            <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-xl text-center space-y-2 py-8">
               <Eye className="w-8 h-8 text-slate-500 mx-auto" />
-              <div className="text-xs font-bold text-slate-300">No Device Pin Selected</div>
+              <div className="text-xs font-bold text-slate-300">No Device Selected</div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Click any device pin on the CAD blueprint to view details, or click <strong>Place Device Pin</strong> to plot equipment.
+                Click any device on the floorplan to inspect live telemetry and update its SANS compliance status, or click <strong>Place Pin</strong> to add detectors.
               </p>
             </div>
           )}
 
-          {/* Blueprint Summary Stats */}
+          {/* SANS 10139 Legend & Device Totals */}
           <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
-            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-300 font-mono">
-              Floor Plan Legend & Device Totals
+            <h5 className="text-xs font-bold uppercase tracking-wider text-slate-300 font-mono flex items-center justify-between">
+              <span>Site-Map Device Inventory</span>
+              <span className="text-cyan-400 font-bold">{devices.length} Total</span>
             </h5>
 
             <div className="space-y-1.5 text-xs font-mono">
               <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded">
                 <div className="flex items-center gap-2">
                   <Radio className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Optical Smoke Detectors</span>
+                  <span>Optical Smoke (7.5m)</span>
                 </div>
-                <span className="font-bold text-white">
-                  {devices.filter(d => d.type === 'smoke').length}
-                </span>
+                <span className="font-bold text-white">{deviceStats.smokes}</span>
               </div>
 
               <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded">
                 <div className="flex items-center gap-2">
                   <Flame className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Heat Detectors</span>
+                  <span>Heat Detectors (5.3m)</span>
                 </div>
-                <span className="font-bold text-white">
-                  {devices.filter(d => d.type === 'heat').length}
-                </span>
+                <span className="font-bold text-white">{deviceStats.heats}</span>
               </div>
 
               <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded">
@@ -858,39 +1064,33 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
                   <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
                   <span>Manual Call Points (MCP)</span>
                 </div>
-                <span className="font-bold text-white">
-                  {devices.filter(d => d.type === 'call_point').length}
-                </span>
+                <span className="font-bold text-white">{deviceStats.mcps}</span>
               </div>
 
               <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded">
                 <div className="flex items-center gap-2">
                   <Bell className="w-3.5 h-3.5 text-pink-400" />
-                  <span>Sounders / Strobes</span>
+                  <span>Sounders / Strobes (65 dBA)</span>
                 </div>
-                <span className="font-bold text-white">
-                  {devices.filter(d => d.type === 'sounder').length}
-                </span>
+                <span className="font-bold text-white">{deviceStats.sounders}</span>
               </div>
 
               <div className="flex items-center justify-between p-1.5 bg-slate-800/50 rounded">
                 <div className="flex items-center gap-2">
                   <Cpu className="w-3.5 h-3.5 text-purple-400" />
-                  <span>Control Panels & Repeaters</span>
+                  <span>Control Panels (FACP)</span>
                 </div>
-                <span className="font-bold text-white">
-                  {devices.filter(d => d.type === 'panel').length}
-                </span>
+                <span className="font-bold text-white">{deviceStats.panels}</span>
               </div>
             </div>
 
             {/* SANS Compliance Note Callout */}
             <div className="p-2.5 rounded-lg bg-blue-950/30 border border-blue-800/60 text-[10px] text-blue-300 font-mono space-y-1">
               <div className="font-bold text-white flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                <span>SANS 10139 Standard Verified</span>
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>SANS 10139 Geometry Verified</span>
               </div>
-              <p>Coverage: {activePlan.squareMeters} m² | Max MCP Spacing &le; 30m</p>
+              <p>Coverage: {activePlan.squareMeters} m² | Max Travel &le; 30m | 24h Battery Autonomy</p>
             </div>
           </div>
         </div>
@@ -901,11 +1101,10 @@ export const FloorPlanBlueprintViewer: React.FC = () => {
         isOpen={isGeneratorModalOpen}
         onClose={() => setIsGeneratorModalOpen(false)}
         onApplyPlan={handleApplyGeneratedPlan}
-        initialSiteReference={selectedRequest?.referenceNumber || 'AFE-SITE-2026'}
-        initialCustomerName={selectedRequest?.customerName || 'Audrin Fire Client'}
-        initialFacilityName={selectedRequest?.facilityName || 'Commercial Facility'}
+        initialSiteReference={activeSiteProfile.siteId.toUpperCase()}
+        initialCustomerName={activeSiteProfile.clientOrganisation}
+        initialFacilityName={activeSiteProfile.siteName}
       />
     </div>
   );
 };
-

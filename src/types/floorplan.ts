@@ -67,7 +67,17 @@ export interface MappedFloorDevice {
   yPercent: number; // 0 - 100
   zone: string;
   lastServicedDate?: string;
-  status: 'operational' | 'due_service' | 'fault';
+  status: 'operational' | 'due_service' | 'fault' | 'testing' | 'offline' | 'alarm';
+  loopNumber?: number;
+  addressNumber?: number;
+  modelNumber?: string;
+  serialNumber?: string;
+  contaminationPercent?: number;
+  batteryPercent?: number;
+  signalMargin?: number;
+  loopVoltage?: number;
+  faultDescription?: string;
+  coverageRadiusMeters?: number;
 }
 
 export interface GeneratedFloorPlan {
