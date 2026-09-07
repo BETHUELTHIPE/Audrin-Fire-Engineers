@@ -9,11 +9,61 @@ import {
   CheckCircle2,
   FileText,
   ShieldAlert,
+  ShieldCheck,
   Info,
-  Sparkles
+  Sparkles,
+  Lock,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ReportPhotoSelection, ReportPhotoCategory } from '../types';
+
+interface SafetyCheckItem {
+  id: string;
+  clause: string;
+  title: string;
+  description: string;
+  isConfirmed: boolean;
+}
+
+const INITIAL_PRE_START_SAFETY_CHECKS: SafetyCheckItem[] = [
+  {
+    id: 'panel_isolation',
+    clause: 'SANS 10139 Clause 25.1',
+    title: 'Control Panel Isolated / Placed in Test Mode',
+    description: 'Repeater & master panel switched to test/engineer mode; 24/7 monitoring room notified to prevent false brigade dispatch.',
+    isConfirmed: false
+  },
+  {
+    id: 'interlocks_isolated',
+    clause: 'SANS 10139 Clause 25.3.4',
+    title: 'Auxiliary Gas Suppression & HVAC Interlocks Isolated',
+    description: 'Clean agent gas discharge circuits, smoke damper trip relays, magnetic door holders, and lift homing verified disarmed.',
+    isConfirmed: false
+  },
+  {
+    id: 'responsible_person_notified',
+    clause: 'SANS 10139 Clause 25.3.1',
+    title: 'Site Responsible Person & Facility Manager Briefed',
+    description: 'On-site safety officer notified of arrival, audibility test zones, and expected physical inspection itinerary.',
+    isConfirmed: false
+  },
+  {
+    id: 'ppe_electrical_safety',
+    clause: 'OHS Act / SANS 10139',
+    title: 'Electrical PPE & Calibrated Test Equipment Verified',
+    description: 'Insulated multimeters (CAT III), optical aerosol test poles, safety stepladders, and electrical LOTO verified intact.',
+    isConfirmed: false
+  },
+  {
+    id: 'logbook_initial_entry',
+    clause: 'SANS 10139 Clause 25.4',
+    title: 'Statutory Fire Logbook Countersigned on Arrival',
+    description: 'Physical building SANS logbook inspected, initial entry stamped with SAQCC registration, and arrival timestamp recorded.',
+    isConfirmed: false
+  }
+];
 
 interface SubmitBeforeWorkEvidenceModalProps {
   initialRequestId?: string | null;
@@ -70,6 +120,25 @@ export const SubmitBeforeWorkEvidenceModal: React.FC<SubmitBeforeWorkEvidenceMod
   const [clientNotes, setClientNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Interactive SANS 10139 Pre-Start Safety Checklist State
+  const [safetyChecks, setSafetyChecks] = useState<SafetyCheckItem[]>(INITIAL_PRE_START_SAFETY_CHECKS);
+
+  const allSafetyChecksConfirmed = safetyChecks.every(check => check.isConfirmed);
+  const confirmedSafetyCount = safetyChecks.filter(check => check.isConfirmed).length;
+
+  const handleToggleSafetyCheck = (id: string) => {
+    setSafetyChecks(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, isConfirmed: !item.isConfirmed } : item
+      )
+    );
+  };
+
+  const handleConfirmAllSafety = () => {
+    setSafetyChecks(prev => prev.map(item => ({ ...item, isConfirmed: true })));
+    showToast('success', 'Safety Protocols Confirmed', 'All 5 SANS 10139 pre-start safety checklist items marked complete.');
+  };
+
   // New photo field inputs
   const [photoUrlInput, setPhotoUrlInput] = useState('');
   const [photoCaptionInput, setPhotoCaptionInput] = useState('');
@@ -121,6 +190,14 @@ export const SubmitBeforeWorkEvidenceModal: React.FC<SubmitBeforeWorkEvidenceMod
   const handleGenerateReport = async () => {
     if (!selectedRequestId) {
       showToast('error', 'Select Request', 'Please select an eligible service request.');
+      return;
+    }
+    if (!allSafetyChecksConfirmed) {
+      showToast(
+        'error',
+        'Safety Checklist Incomplete',
+        'You must complete and confirm all 5 SANS 10139 Pre-Start Safety protocols before submitting evidence.'
+      );
       return;
     }
     if (photos.length === 0) {
@@ -217,12 +294,93 @@ export const SubmitBeforeWorkEvidenceModal: React.FC<SubmitBeforeWorkEvidenceMod
             )}
           </div>
 
+          {/* SECTION 2: SANS 10139 Interactive Pre-Start Safety Checklist */}
+          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-[#FFB703]" />
+                    2. SANS 10139 Pre-Start Safety Checklist
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${
+                      allSafetyChecksConfirmed
+                        ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                        : 'bg-amber-950 text-amber-300 border-amber-800'
+                    }`}
+                  >
+                    {allSafetyChecksConfirmed
+                      ? '5/5 PASSED - SUBMISSION UNLOCKED'
+                      : `${confirmedSafetyCount}/5 CONFIRMED - SUBMISSION LOCKED`}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Engineers must complete and sign off on all statutory isolation and safety protocols before submitting 'Before Work' evidence.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmAllSafety}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors shrink-0 cursor-pointer"
+              >
+                Confirm All Checks
+              </button>
+            </div>
+
+            {/* Checklist items */}
+            <div className="space-y-2 pt-1">
+              {safetyChecks.map((item) => (
+                <div
+                  key={item.id}
+                  onClick={() => handleToggleSafetyCheck(item.id)}
+                  className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
+                    item.isConfirmed
+                      ? 'bg-emerald-950/20 border-emerald-800/80 text-white'
+                      : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700 text-slate-300'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    aria-label={`Toggle check for ${item.title}`}
+                    className="mt-0.5 shrink-0 text-emerald-400"
+                  >
+                    {item.isConfirmed ? (
+                      <CheckSquare className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <Square className="w-4 h-4 text-slate-500" />
+                    )}
+                  </button>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold">{item.title}</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-amber-300">
+                        {item.clause}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  {item.isConfirmed && (
+                    <span className="text-[10px] font-bold text-emerald-400 shrink-0 uppercase tracking-wider">
+                      Verified
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Quick Preset Photo Picker for Fast Testing */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                2. Quick Sample Evidence Presets (Click to add)
+                3. Quick Sample Evidence Presets (Click to add)
               </label>
               <span className="text-[11px] text-slate-500">Pre-configured site test cases</span>
             </div>
@@ -418,30 +576,51 @@ export const SubmitBeforeWorkEvidenceModal: React.FC<SubmitBeforeWorkEvidenceMod
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 bg-slate-100 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-          >
-            Cancel
-          </button>
-
-          <button
-            type="button"
-            disabled={isSubmitting || photos.length === 0}
-            onClick={handleGenerateReport}
-            className="px-5 py-2.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-xl flex items-center gap-2 transition-all shadow-md"
-          >
-            {isSubmitting ? (
-              <>Generating Pre-Work Report...</>
+        <div className="p-4 bg-slate-100 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2 text-xs">
+            {!allSafetyChecksConfirmed ? (
+              <span className="text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5" />
+                Pre-start safety checklist incomplete ({confirmedSafetyCount}/5 confirmed)
+              </span>
+            ) : photos.length === 0 ? (
+              <span className="text-slate-500 font-medium flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5" />
+                Attach at least 1 photograph to submit
+              </span>
             ) : (
-              <>
-                <FileText className="w-4 h-4" />
-                Generate Pre-Work Report & Email Client
-              </>
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Safety confirmed & evidence attached ({photos.length} photos)
+              </span>
             )}
-          </button>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              disabled={isSubmitting || photos.length === 0 || !allSafetyChecksConfirmed}
+              onClick={handleGenerateReport}
+              className="px-5 py-2.5 text-xs font-bold bg-amber-600 hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl flex items-center gap-2 transition-all shadow-md cursor-pointer"
+            >
+              {isSubmitting ? (
+                <>Generating Pre-Work Report...</>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  Generate Pre-Work Report & Email Client
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
       </div>

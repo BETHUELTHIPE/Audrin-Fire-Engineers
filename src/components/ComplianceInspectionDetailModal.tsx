@@ -20,7 +20,8 @@ import {
   ShieldAlert,
   Award,
   RefreshCw,
-  Info
+  Info,
+  Wrench
 } from 'lucide-react';
 import {
   ComplianceInspection,
@@ -43,7 +44,9 @@ export const ComplianceInspectionDetailModal: React.FC = () => {
     exportInspectionICal,
     getSuggestedSlots,
     technicians,
-    showToast
+    showToast,
+    setIsMaintenanceCheckModalOpen,
+    setPreselectedSiteForMaintenance
   } = useApp();
 
   const [isRescheduling, setIsRescheduling] = useState(false);
@@ -465,11 +468,32 @@ export const ComplianceInspectionDetailModal: React.FC = () => {
             </div>
           )}
 
-          {/* Footer Close */}
-          <div className="pt-4 border-t border-slate-200 flex justify-end">
+          {/* Footer Actions */}
+          <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setPreselectedSiteForMaintenance({
+                  siteId: insp.siteId || 'site-01',
+                  siteName: insp.siteName,
+                  clientOrganisation: insp.clientOrganisation,
+                  panelMakeModel: insp.panelMakeModel,
+                  locationDetails: insp.siteAddress,
+                  inspectionId: insp.id,
+                  inspectionTitle: insp.title
+                });
+                setSelectedInspectionForDetail(null);
+                setIsMaintenanceCheckModalOpen(true);
+              }}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-sm transition-all flex items-center gap-2 cursor-pointer w-full sm:w-auto"
+            >
+              <Wrench className="w-3.5 h-3.5 text-amber-400" />
+              <span>Conduct SANS Maintenance &amp; Remedial Check</span>
+            </button>
+
             <button
               onClick={() => setSelectedInspectionForDetail(null)}
-              className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-xs uppercase tracking-wider rounded-sm transition-colors cursor-pointer"
+              className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono font-bold text-xs uppercase tracking-wider rounded-sm transition-colors cursor-pointer w-full sm:w-auto"
             >
               Close Window
             </button>

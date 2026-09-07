@@ -24,8 +24,10 @@ import {
   CalendarDays,
   List,
   Grid3X3,
-  CalendarRange
+  CalendarRange,
+  BarChart3
 } from 'lucide-react';
+import { ServiceDueDashboard } from './ServiceDueDashboard';
 import {
   ComplianceInspection,
   SANS10139InspectionType,
@@ -52,8 +54,8 @@ export const ComplianceCalendar: React.FC<{ initialSiteFilter?: string }> = ({ i
     showToast
   } = useApp();
 
-  // Calendar View State: 'month' | 'week' | 'agenda'
-  const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda'>('month');
+  // Calendar View State: 'month' | 'week' | 'agenda' | 'service_due'
+  const [viewMode, setViewMode] = useState<'month' | 'week' | 'agenda' | 'service_due'>('month');
   
   // Current calendar navigation date (Default: September 2026 for demo timeline)
   const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 8, 1)); // September 2026
@@ -408,6 +410,18 @@ export const ComplianceCalendar: React.FC<{ initialSiteFilter?: string }> = ({ i
               <List className="w-3.5 h-3.5" />
               <span>Agenda List ({filteredInspections.length})</span>
             </button>
+
+            <button
+              onClick={() => setViewMode('service_due')}
+              className={`px-3 py-1 rounded-sm text-xs font-mono font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                viewMode === 'service_due'
+                  ? 'bg-[#CC0000] text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <BarChart3 className="w-3.5 h-3.5" />
+              <span>Service Due Horizons</span>
+            </button>
           </div>
         </div>
 
@@ -700,6 +714,11 @@ export const ComplianceCalendar: React.FC<{ initialSiteFilter?: string }> = ({ i
             </div>
           )}
         </div>
+      )}
+
+      {/* VIEW MODE 3: SERVICE DUE VISUALIZATION DASHBOARD */}
+      {viewMode === 'service_due' && (
+        <ServiceDueDashboard siteIdFilter={siteFilter !== 'all' ? siteFilter : undefined} />
       )}
 
       {/* Legend and Regulatory Reference Footer */}

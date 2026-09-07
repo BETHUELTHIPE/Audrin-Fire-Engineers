@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* ==========================================================================
      GEOMETRIC BALANCE DESIGN SYSTEM: Custom Geometry-Inspired Spacing Scales
@@ -204,5 +206,72 @@
     height: 3px;
     background: transparent;
   }
+}
+
+/* ==========================================================================
+   NIGHT-TIME INSPECTION MODE: Brand-Navy Dark Theme System
+   Designed specifically for low-light compliance checks, panel diagnostics,
+   and nocturnal warehouse/industrial site inspections.
+   ========================================================================== */
+html.dark {
+  color-scheme: dark;
+  background-color: #050D1A;
+  color: #f1f5f9;
+}
+
+html.dark body {
+  background-color: #050D1A;
+  color: #f1f5f9;
+}
+
+/* Geometric balance classes in dark mode */
+.dark .geo-card {
+  border-color: #1e3a5f;
+  background-color: #0A192F;
+  color: #f8fafc;
+}
+
+.dark .geo-metric-card {
+  border-top-color: #38bdf8;
+  border-right-color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  border-left-color: #1e3a5f;
+  background-color: #0A192F;
+  color: #f8fafc;
+}
+
+.dark .geo-metric-card-red {
+  border-top-color: #CC0000;
+  border-right-color: #1e3a5f;
+  border-bottom-color: #1e3a5f;
+  border-left-color: #1e3a5f;
+  background-color: #0A192F;
+  color: #f8fafc;
+}
+
+.dark .geo-btn-secondary {
+  background-color: #112240;
+  border-color: #1e3a5f;
+  color: #f1f5f9;
+}
+
+.dark .geo-btn-secondary:hover {
+  background-color: #19355e;
+}
+
+.dark .geo-input {
+  border-color: #1e3a5f;
+  background-color: #0A192F;
+  color: #f8fafc;
+}
+
+.dark .geo-input:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+
+.dark .geo-blueprint-grid {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
 }
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { COMPANY_DETAILS, SANS_10139_CATEGORIES, INDUSTRIES_SERVED, SUPPORTED_SYSTEMS } from '../data/initialData';
 import {
@@ -70,70 +71,81 @@ export const HomeView: React.FC = () => {
     <div className="space-y-16 sm:space-y-24 pb-20">
       
       {/* 1. HERO SECTION: Geometric Balance Split Hero */}
-      <section className="relative bg-white text-[#0A192F] border-b border-gray-100 overflow-hidden">
+      <section className="relative bg-white dark:bg-[#0A192F] text-[#0A192F] dark:text-white border-b border-gray-100 dark:border-slate-800 overflow-hidden">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row">
           
           {/* Left Hero Content Section */}
-          <div className="w-full lg:w-7/12 p-8 sm:p-12 lg:p-16 flex flex-col justify-center relative">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 -z-10 translate-x-16 -translate-y-16 rounded-full opacity-50"></div>
+          <motion.div
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full lg:w-7/12 p-8 sm:p-12 lg:p-16 flex flex-col justify-center relative"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 dark:bg-slate-800/40 -z-10 translate-x-16 -translate-y-16 rounded-full opacity-50"></div>
             
             <div className="flex items-center gap-2 mb-4">
               <span className="text-[#CC0000] font-bold text-xs uppercase tracking-[0.3em]">
                 Commercial & Industrial
               </span>
-              <span className="text-gray-300">/</span>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+              <span className="text-gray-300 dark:text-slate-600">/</span>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-slate-400">
                 SANS 10139
               </span>
             </div>
 
-            <h1 className="text-4xl sm:text-6xl font-extrabold leading-[1.05] tracking-tight mb-6 text-[#0A192F]">
+            <h1 className="text-4xl sm:text-6xl font-extrabold leading-[1.05] tracking-tight mb-6 text-[#0A192F] dark:text-white">
               Professional <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] to-[#254170]">
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] dark:from-white to-[#254170] dark:to-slate-300">
                 Fire-Detection
               </span>
               <br /> and Alarm Services
             </h1>
 
-            <p className="text-gray-600 text-base sm:text-lg leading-relaxed max-w-xl mb-8">
+            <p className="text-gray-600 dark:text-slate-300 text-base sm:text-lg leading-relaxed max-w-xl mb-8">
               Specialized design, installation, commissioning, preventative maintenance, and fault diagnosis aligned strictly with SANS 10139 requirements for non-domestic commercial premises.
             </p>
 
             <div className="flex flex-col sm:flex-row flex-wrap gap-4 mb-8">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
                 onClick={() => handleRequestService()}
-                className="px-8 py-4 bg-[#CC0000] hover:bg-red-700 active:scale-95 text-white font-bold text-xs sm:text-sm uppercase tracking-widest rounded-sm shadow-lg shadow-red-100 hover:scale-[1.02] transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="px-8 py-4 bg-[#CC0000] hover:bg-red-700 active:scale-95 text-white font-bold text-xs sm:text-sm uppercase tracking-widest rounded-sm shadow-lg shadow-red-100 dark:shadow-red-950/50 transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <FilePlus className="w-4 h-4" />
                 <span>Request Site Survey</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
                 onClick={() => setIsVoicePlayerOpen(true)}
-                className="px-6 py-4 bg-[#0A192F] hover:bg-[#1E293B] active:scale-95 text-white font-bold text-xs sm:text-sm uppercase tracking-widest rounded-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 border-l-4 border-l-[#CC0000]"
+                className="px-6 py-4 bg-[#0A192F] dark:bg-[#112240] hover:bg-[#1E293B] active:scale-95 text-white font-bold text-xs sm:text-sm uppercase tracking-widest rounded-sm shadow-md transition-all cursor-pointer flex items-center justify-center gap-2.5 border-l-4 border-l-[#CC0000]"
                 title="Launch Voice AI Guide to listen to our 7-step process"
               >
                 <Headphones className="w-4 h-4 text-[#CC0000] animate-pulse" />
                 <span>Listen: How Our Process Works</span>
-              </button>
+              </motion.button>
 
-              <button
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
                 onClick={() => setIsEmergencyModalOpen(true)}
-                className="px-6 py-4 border-2 border-[#0A192F] hover:bg-gray-50 text-[#0A192F] font-bold text-xs sm:text-sm uppercase tracking-widest rounded-sm transition-all cursor-pointer flex items-center justify-center gap-2"
+                className="px-6 py-4 border-2 border-[#0A192F] dark:border-slate-600 hover:bg-gray-50 dark:hover:bg-slate-800 text-[#0A192F] dark:text-white font-bold text-xs sm:text-sm uppercase tracking-widest rounded-sm transition-all cursor-pointer flex items-center justify-center gap-2"
               >
                 <AlertTriangle className="w-4 h-4 text-[#CC0000]" />
                 <span>Fault Support</span>
-              </button>
+              </motion.button>
             </div>
 
             {/* Geometric Assurance Indicators */}
-            <div className="pt-6 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-semibold text-gray-600">
+            <div className="pt-6 border-t border-gray-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-semibold text-gray-600 dark:text-slate-300">
               <div className="flex items-center gap-2">
                 <span className="w-1.5 h-1.5 bg-[#CC0000]"></span>
                 <span>SANS 10139 Categories</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-[#0A192F]"></span>
+                <span className="w-1.5 h-1.5 bg-[#0A192F] dark:bg-white"></span>
                 <span>Commercial & Industrial</span>
               </div>
               <div className="flex items-center gap-2">
@@ -141,47 +153,61 @@ export const HomeView: React.FC = () => {
                 <span>Open & Closed Protocols</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {/* Right Visual/Grid Section (Geometric Balance Panel) */}
-          <div className="w-full lg:w-5/12 bg-[#F8F9FA] border-t lg:border-t-0 lg:border-l border-gray-200 p-8 sm:p-10 flex flex-col justify-between">
+          <motion.div
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.45, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full lg:w-5/12 bg-[#F8F9FA] dark:bg-[#061224] border-t lg:border-t-0 lg:border-l border-gray-200 dark:border-slate-800 p-8 sm:p-10 flex flex-col justify-between"
+          >
             <div className="mb-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-500">
+                <h3 className="text-[11px] font-bold uppercase tracking-widest text-gray-500 dark:text-slate-400">
                   Our Seven-Step Process
                 </h3>
                 <button
                   onClick={() => setActiveView('how-we-work')}
-                  className="text-[10px] font-bold uppercase tracking-wider text-[#CC0000] hover:underline"
+                  className="text-[10px] font-bold uppercase tracking-wider text-[#CC0000] hover:underline cursor-pointer"
                 >
                   View All Steps →
                 </button>
               </div>
 
               <div className="space-y-3">
-                <div className="flex items-center gap-4 bg-white p-3.5 rounded-sm border-l-4 border-[#0A192F] shadow-sm">
-                  <span className="text-xs font-black bg-gray-100 text-[#0A192F] w-6 h-6 flex items-center justify-center rounded-sm">01</span>
-                  <span className="text-xs font-bold uppercase tracking-wide text-[#0A192F]">Site Survey & Assessment</span>
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  className="flex items-center gap-4 bg-white dark:bg-slate-900 p-3.5 rounded-sm border-l-4 border-[#0A192F] dark:border-l-blue-400 shadow-sm transition-all"
+                >
+                  <span className="text-xs font-black bg-gray-100 dark:bg-slate-800 text-[#0A192F] dark:text-white w-6 h-6 flex items-center justify-center rounded-sm">01</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#0A192F] dark:text-slate-100">Site Survey & Assessment</span>
                   <span className="ml-auto text-[#FFB703]">
                     <CheckCircle2 className="w-4 h-4" />
                   </span>
-                </div>
+                </motion.div>
 
-                <div className="flex items-center gap-4 bg-white p-3.5 rounded-sm border-l-4 border-[#CC0000] shadow-sm">
-                  <span className="text-xs font-black bg-gray-100 text-[#0A192F] w-6 h-6 flex items-center justify-center rounded-sm">02</span>
-                  <span className="text-xs font-bold uppercase tracking-wide text-[#0A192F]">Technical System Design</span>
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  className="flex items-center gap-4 bg-white dark:bg-slate-900 p-3.5 rounded-sm border-l-4 border-[#CC0000] shadow-sm transition-all"
+                >
+                  <span className="text-xs font-black bg-gray-100 dark:bg-slate-800 text-[#0A192F] dark:text-white w-6 h-6 flex items-center justify-center rounded-sm">02</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#0A192F] dark:text-slate-100">Technical System Design</span>
                   <span className="ml-auto text-gray-400">
                     <ChevronRight className="w-4 h-4" />
                   </span>
-                </div>
+                </motion.div>
 
-                <div className="flex items-center gap-4 bg-white p-3.5 rounded-sm border-l-4 border-[#0A192F] shadow-sm">
-                  <span className="text-xs font-black bg-gray-100 text-[#0A192F] w-6 h-6 flex items-center justify-center rounded-sm">03</span>
-                  <span className="text-xs font-bold uppercase tracking-wide text-[#0A192F]">Testing & Commissioning</span>
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  className="flex items-center gap-4 bg-white dark:bg-slate-900 p-3.5 rounded-sm border-l-4 border-[#0A192F] dark:border-l-blue-400 shadow-sm transition-all"
+                >
+                  <span className="text-xs font-black bg-gray-100 dark:bg-slate-800 text-[#0A192F] dark:text-white w-6 h-6 flex items-center justify-center rounded-sm">03</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-[#0A192F] dark:text-slate-100">Testing & Commissioning</span>
                   <span className="ml-auto text-gray-400">
                     <ChevronRight className="w-4 h-4" />
                   </span>
-                </div>
+                </motion.div>
               </div>
             </div>
 
@@ -192,22 +218,22 @@ export const HomeView: React.FC = () => {
                 <p className="text-[9px] uppercase tracking-widest text-gray-300 font-bold">Compliance Focused</p>
                 <p className="text-[10px] text-gray-400 mt-2 font-mono">SANS 10139 Code</p>
               </div>
-              <div className="bg-white p-5 rounded-sm border border-gray-200 shadow-sm">
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-sm border border-gray-200 dark:border-slate-800 shadow-sm">
                 <p className="text-3xl font-black mb-1 text-[#CC0000]">24/7</p>
-                <p className="text-[9px] uppercase tracking-widest text-gray-500 font-bold">Fault Assistance</p>
+                <p className="text-[9px] uppercase tracking-widest text-gray-500 dark:text-slate-400 font-bold">Fault Assistance</p>
                 <p className="text-[10px] text-gray-400 mt-2 font-mono">071 415 6665</p>
               </div>
             </div>
 
             {/* Pretoria West Desk Info */}
-            <div className="mt-6 pt-4 border-t border-gray-200/80 flex items-center justify-between text-[11px] text-gray-500">
+            <div className="mt-6 pt-4 border-t border-gray-200/80 dark:border-slate-800 flex items-center justify-between text-[11px] text-gray-500 dark:text-slate-400">
               <div className="flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5 text-[#CC0000]" />
                 <span>Pretoria West, 0008, ZA</span>
               </div>
-              <span className="font-mono text-[#0A192F] font-bold">K2026089596</span>
+              <span className="font-mono text-[#0A192F] dark:text-white font-bold">K2026089596</span>
             </div>
-          </div>
+          </motion.div>
 
         </div>
       </section>
@@ -423,19 +449,31 @@ export const HomeView: React.FC = () => {
 
         {/* Category Filter Pills */}
         <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 no-scrollbar">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
-                selectedCategory === cat.id
-                  ? 'bg-[#0A192F] text-white shadow-sm'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+          {categories.map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            return (
+              <motion.button
+                key={cat.id}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`relative px-4 py-2 rounded-sm text-xs font-bold uppercase tracking-wider whitespace-nowrap transition-colors cursor-pointer ${
+                  isSelected
+                    ? 'text-white'
+                    : 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {isSelected && (
+                  <motion.div
+                    layoutId="activeCategoryPill"
+                    className="absolute inset-0 bg-[#0A192F] dark:bg-blue-600 rounded-sm -z-0"
+                    transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  />
+                )}
+                <span className="relative z-10">{cat.label}</span>
+              </motion.button>
+            );
+          })}
         </div>
 
         {/* Services Grid */}
@@ -443,9 +481,14 @@ export const HomeView: React.FC = () => {
           {(filteredServices || []).slice(0, 6).map((srv) => {
             const scopeList = srv.scopeOfWork || (srv as any).scopePoints || [];
             return (
-              <div
+              <motion.div
                 key={srv.id}
-                className="bg-white border border-gray-200 rounded-sm p-6 hover:border-gray-400 hover:shadow-lg transition-all flex flex-col justify-between group border-l-4 border-l-[#0A192F] hover:border-l-[#CC0000]"
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.25 }}
+                className="bg-white dark:bg-[#0A192F] border border-gray-200 dark:border-slate-800 rounded-sm p-6 hover:border-gray-400 dark:hover:border-slate-600 hover:shadow-lg transition-all flex flex-col justify-between group border-l-4 border-l-[#0A192F] dark:border-l-blue-400 hover:border-l-[#CC0000] dark:hover:border-l-[#CC0000]"
               >
                 <div>
                   <div className="flex items-center justify-between mb-3">
@@ -495,7 +538,7 @@ export const HomeView: React.FC = () => {
                     Request Scope
                   </button>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -576,25 +619,36 @@ export const HomeView: React.FC = () => {
             return (
               <div
                 key={faq.id}
-                className="bg-white border border-gray-200 rounded-sm overflow-hidden transition-all shadow-sm"
+                className="bg-white dark:bg-[#0A192F] border border-gray-200 dark:border-slate-800 rounded-sm overflow-hidden transition-all shadow-sm"
               >
                 <button
                   onClick={() => setOpenFaqIndex(isOpen ? null : index)}
-                  className="w-full px-5 py-4 text-left font-bold text-xs sm:text-sm uppercase tracking-wide text-[#0A192F] flex items-center justify-between hover:bg-gray-50 transition-colors cursor-pointer"
+                  className="w-full px-5 py-4 text-left font-bold text-xs sm:text-sm uppercase tracking-wide text-[#0A192F] dark:text-white flex items-center justify-between hover:bg-gray-50 dark:hover:bg-slate-800/60 transition-colors cursor-pointer"
                 >
                   <span className="pr-4">{faq.question}</span>
-                  <ChevronDown className={`w-4 h-4 text-gray-500 shrink-0 transition-transform ${isOpen ? 'rotate-180 text-[#CC0000]' : ''}`} />
+                  <ChevronDown className={`w-4 h-4 text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#CC0000]' : ''}`} />
                 </button>
 
-                {isOpen && (
-                  <div className="px-5 pb-5 text-xs text-gray-600 leading-relaxed border-t border-gray-100 pt-3">
-                    <p>{faq.answer}</p>
-                    <div className="mt-3 flex items-center justify-between text-[11px] text-gray-400">
-                      <span>Category: <strong className="text-[#0A192F]">{faq.category}</strong></span>
-                      {faq.sansClause && <span>Ref: <strong className="text-[#CC0000]">{faq.sansClause}</strong></span>}
-                    </div>
-                  </div>
-                )}
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      key="content"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <div className="px-5 pb-5 text-xs text-gray-600 dark:text-slate-300 leading-relaxed border-t border-gray-100 dark:border-slate-800 pt-3">
+                        <p>{faq.answer}</p>
+                        <div className="mt-3 flex items-center justify-between text-[11px] text-gray-400 dark:text-slate-500">
+                          <span>Category: <strong className="text-[#0A192F] dark:text-slate-200">{faq.category}</strong></span>
+                          {faq.sansClause && <span>Ref: <strong className="text-[#CC0000]">{faq.sansClause}</strong></span>}
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             );
           })}

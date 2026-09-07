@@ -25,6 +25,12 @@ import {
   APPROVED_SOURCE_PDFS,
   STATUTORY_SECTION_MAPPINGS
 } from '../data/safetyFileSectionMapping';
+import {
+  generateSafetyFilePdf,
+  downloadSafetyFilePdf,
+  SafetyFilePdfOptions
+} from '../utils/safetyFilePdfGenerator';
+import type jsPDF from 'jspdf';
 
 const STORAGE_KEY = 'audrin_fire_detection_safety_files_v1';
 
@@ -2937,6 +2943,26 @@ class SafetyFileService {
     const hex8 = ('00000000' + ((hash ^ 0x22334455) >>> 0).toString(16)).slice(-8);
 
     return `${hex1}${hex2}${hex3}${hex4}${hex5}${hex6}${hex7}${hex8}`;
+  }
+
+  /**
+   * Generates a SANS 10139 compliant PDF document instance for the given safety file dossier.
+   */
+  public generateSafetyFilePdf(
+    file: SafetyFile,
+    options?: SafetyFilePdfOptions
+  ): jsPDF {
+    return generateSafetyFilePdf(file, options);
+  }
+
+  /**
+   * Generates and automatically downloads the SANS 10139 Fire Detection Safety File dossier as a PDF.
+   */
+  public downloadSafetyFilePdf(
+    file: SafetyFile,
+    options?: SafetyFilePdfOptions
+  ): void {
+    downloadSafetyFilePdf(file, options);
   }
 }
 

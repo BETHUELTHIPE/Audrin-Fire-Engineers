@@ -44,8 +44,17 @@ import {
   PushNotificationItem,
   PushNotificationPreferences,
   PushNotificationSeverity,
-  PushNotificationType
+  PushNotificationType,
+  RemedialActionTask,
+  SANSRequirementItem,
+  RemedialTaskStatus,
+  RemedialTaskPriority
 } from '../types';
+import {
+  INITIAL_REMEDIAL_TASKS,
+  autoGenerateRemedialTasksForChecks,
+  downloadRemedialWorkOrderFile
+} from '../services/remedialActionService';
 import {
   COMPANY_DETAILS,
   INITIAL_SERVICES,
@@ -104,6 +113,8 @@ import {
   PushPermissionStatus,
   DispatchNotificationOptions
 } from '../services/pushNotificationService';
+import { FireDetectionDevice, DeviceMaintenanceLogEntry } from '../types/deviceLog';
+import { INITIAL_FIRE_DETECTION_DEVICES } from '../data/deviceData';
 
 export interface ToastMessage {
   id: string;
@@ -113,6 +124,11 @@ export interface ToastMessage {
 }
 
 interface AppContextType {
+  // Global Theme: Light vs Night-Time Site Inspection Mode (Brand-Navy Dark)
+  theme: 'light' | 'dark';
+  setTheme: (theme: 'light' | 'dark') => void;
+  toggleTheme: () => void;
+
   // Navigation
   activeView: string;
   setActiveView: (view: string) => void;
@@ -231,6 +247,67 @@ interface AppContextType {
   getSuggestedSlots: (site: { siteName: string; city?: string; streetAddress?: string }, inspectionType: SANS10139InspectionType, targetDate?: string) => SuggestedTimeSlot[];
   exportInspectionICal: (inspection: ComplianceInspection) => void;
 
+  // SANS Remedial Actions Task List & Immediate Technician Assignment
+  remedialTasks: RemedialActionTask[];
+  isMaintenanceCheckModalOpen: boolean;
+  setIsMaintenanceCheckModalOpen: (open: boolean) => void;
+  preselectedSiteForMaintenance: {
+    siteId: string;
+    siteName: string;
+    clientOrganisation: string;
+    panelMakeModel?: string;
+    locationDetails?: string;
+    inspectionId?: string;
+    inspectionTitle?: string;
+  } | null;
+  setPreselectedSiteForMaintenance: (site: {
+    siteId: string;
+    siteName: string;
+    clientOrganisation: string;
+    panelMakeModel?: string;
+    locationDetails?: string;
+    inspectionId?: string;
+    inspectionTitle?: string;
+  } | null) => void;
+  isAssignRemedialModalOpen: boolean;
+  setIsAssignRemedialModalOpen: (open: boolean) => void;
+  selectedRemedialTaskForAssignment: RemedialActionTask | null;
+  setSelectedRemedialTaskForAssignment: (task: RemedialActionTask | null) => void;
+  generateRemedialTasksFromChecks: (
+    siteInfo: {
+      siteId: string;
+      siteName: string;
+      clientOrganisation: string;
+      panelMakeModel?: string;
+      locationDetails?: string;
+    },
+    checks: SANSRequirementItem[],
+    inspectionId?: string,
+    inspectionTitle?: string
+  ) => RemedialActionTask[];
+  assignTechnicianToRemedialTask: (
+    taskId: string,
+    technicianId: string,
+    scheduledDate: string,
+    timeWindow: string,
+    dispatchNotes?: string
+  ) => void;
+  batchAssignRemedialTasks: (
+    taskIds: string[],
+    technicianId: string,
+    scheduledDate: string,
+    timeWindow: string,
+    dispatchNotes?: string
+  ) => void;
+  updateRemedialTaskStatus: (
+    taskId: string,
+    status: RemedialTaskStatus,
+    notes?: string,
+    retestPassed?: boolean
+  ) => void;
+  createRemedialTask: (taskData: Partial<RemedialActionTask>) => RemedialActionTask;
+  exportRemedialWorkOrder: (task: RemedialActionTask) => void;
+
   // Auth
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
@@ -292,11 +369,71 @@ interface AppContextType {
   clearAllPushNotifications: () => void;
   updatePushPreferences: (partial: Partial<PushNotificationPreferences>) => void;
   testSoundChime: (severity?: PushNotificationSeverity) => void;
+
+  // Fire Detection Devices & Printable QR Code Labels
+  fireDetectionDevices: FireDetectionDevice[];
+  selectedDeviceForLog: FireDetectionDevice | null;
+  setSelectedDeviceForLog: (device: FireDetectionDevice | null) => void;
+  isDeviceLogModalOpen: boolean;
+  setIsDeviceLogModalOpen: (open: boolean) => void;
+  isDeviceQRGeneratorModalOpen: boolean;
+  setIsDeviceQRGeneratorModalOpen: (open: boolean) => void;
+  qrGeneratorPreselectedSiteId?: string;
+  qrGeneratorPreselectedDeviceId?: string;
+  openDeviceMaintenanceLog: (deviceId: string) => void;
+  closeDeviceMaintenanceLog: () => void;
+  openDeviceQRGenerator: (siteId?: string, deviceId?: string) => void;
+  closeDeviceQRGenerator: () => void;
+  addDeviceMaintenanceLog: (deviceId: string, entry: DeviceMaintenanceLogEntry) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Global Theme State: 'light' vs 'dark' (Brand-Navy palette for night-time site inspections)
+  const [theme, setThemeState] = useState<'light' | 'dark'>(() => {
+    try {
+      const saved = localStorage.getItem('audrin_fire_theme');
+      if (saved === 'dark' || saved === 'light') return saved;
+      if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+    } catch {
+      // ignore
+    }
+    return 'light';
+  });
+
+  const setTheme = (newTheme: 'light' | 'dark') => {
+    setThemeState(newTheme);
+    try {
+      localStorage.setItem('audrin_fire_theme', newTheme);
+    } catch {
+      // ignore
+    }
+    if (typeof document !== 'undefined') {
+      if (newTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  };
+
+  const toggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, [theme]);
+
   // Navigation State
   const [activeView, setActiveView] = useState<string>('home');
   const [selectedServiceSlug, setSelectedServiceSlug] = useState<string | null>(null);
@@ -373,6 +510,122 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  // Fire Detection Devices & SANS 10139 QR Code Labels
+  const [fireDetectionDevices, setFireDetectionDevices] = useState<FireDetectionDevice[]>(INITIAL_FIRE_DETECTION_DEVICES);
+  const [selectedDeviceForLog, setSelectedDeviceForLog] = useState<FireDetectionDevice | null>(null);
+  const [isDeviceLogModalOpen, setIsDeviceLogModalOpen] = useState<boolean>(false);
+  const [isDeviceQRGeneratorModalOpen, setIsDeviceQRGeneratorModalOpen] = useState<boolean>(false);
+  const [qrGeneratorPreselectedSiteId, setQrGeneratorPreselectedSiteId] = useState<string | undefined>(undefined);
+  const [qrGeneratorPreselectedDeviceId, setQrGeneratorPreselectedDeviceId] = useState<string | undefined>(undefined);
+
+  const openDeviceMaintenanceLog = (deviceId: string) => {
+    const dev = fireDetectionDevices.find(d => d.id.toLowerCase() === deviceId.toLowerCase());
+    if (dev) {
+      setSelectedDeviceForLog(dev);
+      setIsDeviceLogModalOpen(true);
+    } else {
+      showToast('error', 'Device Not Found', `No registered SANS 10139 device with ID ${deviceId} was found.`);
+    }
+  };
+
+  const closeDeviceMaintenanceLog = () => {
+    setIsDeviceLogModalOpen(false);
+    setSelectedDeviceForLog(null);
+  };
+
+  const openDeviceQRGenerator = (siteId?: string, deviceId?: string) => {
+    setQrGeneratorPreselectedSiteId(siteId);
+    setQrGeneratorPreselectedDeviceId(deviceId);
+    setIsDeviceQRGeneratorModalOpen(true);
+  };
+
+  const closeDeviceQRGenerator = () => {
+    setIsDeviceQRGeneratorModalOpen(false);
+    setQrGeneratorPreselectedSiteId(undefined);
+    setQrGeneratorPreselectedDeviceId(undefined);
+  };
+
+  const addDeviceMaintenanceLog = (deviceId: string, entry: DeviceMaintenanceLogEntry) => {
+    setFireDetectionDevices(prev => prev.map(dev => {
+      if (dev.id.toLowerCase() !== deviceId.toLowerCase()) return dev;
+      const updatedHistory = [entry, ...dev.maintenanceHistory];
+      const isDefect = entry.result === 'defect';
+      const isPass = entry.result === 'pass' || entry.result === 'serviced';
+      const newStatus = isDefect ? 'defect_fault' : 'normal';
+      const newContamination = entry.serviceType === 'chamber_cleaning' ? 4 : dev.analogueTelemetry.contaminationPercent;
+
+      return {
+        ...dev,
+        status: newStatus,
+        lastServiceDate: entry.date.split(' ')[0],
+        nextSansDueDate: isDefect ? dev.nextSansDueDate : '2026-12-08',
+        analogueTelemetry: {
+          ...dev.analogueTelemetry,
+          contaminationPercent: newContamination
+        },
+        sans10139ComplianceScore: isPass ? Math.min(100, dev.sans10139ComplianceScore + 6) : 50,
+        maintenanceHistory: updatedHistory
+      };
+    }));
+
+    setSelectedDeviceForLog(prev => {
+      if (!prev || prev.id.toLowerCase() !== deviceId.toLowerCase()) return prev;
+      const updatedHistory = [entry, ...prev.maintenanceHistory];
+      const isDefect = entry.result === 'defect';
+      const isPass = entry.result === 'pass' || entry.result === 'serviced';
+      const newStatus = isDefect ? 'defect_fault' : 'normal';
+      const newContamination = entry.serviceType === 'chamber_cleaning' ? 4 : prev.analogueTelemetry.contaminationPercent;
+
+      return {
+        ...prev,
+        status: newStatus,
+        lastServiceDate: entry.date.split(' ')[0],
+        nextSansDueDate: isDefect ? prev.nextSansDueDate : '2026-12-08',
+        analogueTelemetry: {
+          ...prev.analogueTelemetry,
+          contaminationPercent: newContamination
+        },
+        sans10139ComplianceScore: isPass ? Math.min(100, prev.sans10139ComplianceScore + 6) : 50,
+        maintenanceHistory: updatedHistory
+      };
+    });
+  };
+
+  // Check URL parameters for QR scan deep link on mount & hashchange
+  useEffect(() => {
+    const checkDeepLink = () => {
+      if (typeof window === 'undefined') return;
+      const params = new URLSearchParams(window.location.search);
+      const deviceParam = params.get('device');
+      const hashParam = window.location.hash;
+
+      let targetId = deviceParam;
+      if (!targetId && hashParam && hashParam.includes('device=')) {
+        const match = hashParam.match(/device=([^&]+)/);
+        if (match) targetId = decodeURIComponent(match[1]);
+      }
+
+      if (targetId) {
+        const found = INITIAL_FIRE_DETECTION_DEVICES.find(
+          d => d.id.toLowerCase() === targetId!.toLowerCase()
+        );
+        if (found) {
+          setSelectedDeviceForLog(found);
+          setIsDeviceLogModalOpen(true);
+          showToast('info', 'SANS 10139 Log Loaded', `Device ${found.id} detected via QR scan deep link.`);
+        }
+      }
+    };
+
+    checkDeepLink();
+    window.addEventListener('popstate', checkDeepLink);
+    window.addEventListener('hashchange', checkDeepLink);
+    return () => {
+      window.removeEventListener('popstate', checkDeepLink);
+      window.removeEventListener('hashchange', checkDeepLink);
+    };
+  }, []);
 
   const showToast = (type: 'success' | 'error' | 'info' | 'warning', title: string, description: string) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
@@ -2303,6 +2556,251 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('info', 'Calendar Event Exported', `Downloaded .ics event for ${inspection.title}. You can import this into Google Calendar or Outlook.`);
   };
 
+  // -------------------------------------------------------------
+  // SANS REMEDIAL ACTIONS TASK LIST & TECHNICIAN DISPATCH ENGINE
+  // -------------------------------------------------------------
+  const [remedialTasks, setRemedialTasks] = useState<RemedialActionTask[]>(INITIAL_REMEDIAL_TASKS);
+  const [isMaintenanceCheckModalOpen, setIsMaintenanceCheckModalOpen] = useState<boolean>(false);
+  const [preselectedSiteForMaintenance, setPreselectedSiteForMaintenance] = useState<{
+    siteId: string;
+    siteName: string;
+    clientOrganisation: string;
+    panelMakeModel?: string;
+    locationDetails?: string;
+    inspectionId?: string;
+    inspectionTitle?: string;
+  } | null>(null);
+  const [isAssignRemedialModalOpen, setIsAssignRemedialModalOpen] = useState<boolean>(false);
+  const [selectedRemedialTaskForAssignment, setSelectedRemedialTaskForAssignment] = useState<RemedialActionTask | null>(null);
+
+  // Auto-generate Remedial Action Tasks from failed SANS checks
+  const generateRemedialTasksFromChecks = (
+    siteInfo: {
+      siteId: string;
+      siteName: string;
+      clientOrganisation: string;
+      panelMakeModel?: string;
+      locationDetails?: string;
+    },
+    checks: SANSRequirementItem[],
+    inspectionId?: string,
+    inspectionTitle?: string
+  ): RemedialActionTask[] => {
+    const newTasks = autoGenerateRemedialTasksForChecks(
+      checks,
+      siteInfo,
+      inspectionId,
+      inspectionTitle,
+      currentUser?.name || 'Admin Bethuel'
+    );
+
+    if (newTasks.length > 0) {
+      setRemedialTasks(prev => [...newTasks, ...prev]);
+
+      // Create audit log event
+      addAuditLog(
+        'CREATE_REMEDIAL_TASKS',
+        'RemedialActionTask',
+        newTasks[0].id,
+        `Auto-generated ${newTasks.length} Remedial Action Task(s) for ${siteInfo.siteName} due to failed SANS requirements (${newTasks.map(t => t.sansClause).join(', ')})`
+      );
+
+      // Trigger high priority push notification if there are critical items
+      const criticalCount = newTasks.filter(t => t.priority === 'critical').length;
+      if (criticalCount > 0) {
+        sendPushAlert({
+          type: 'urgent_dispatch',
+          title: `CRITICAL SANS DEFECT: ${criticalCount} Remedial Action(s) Generated`,
+          body: `${siteInfo.siteName} failed statutory requirements. Admin action required: Assign technicians immediately to prevent COC suspension.`,
+          severity: 'critical',
+          siteName: siteInfo.siteName
+        });
+      }
+
+      showToast(
+        'warning',
+        `${newTasks.length} Remedial Task(s) Auto-Generated`,
+        `Generated actionable task list for ${siteInfo.siteName}. Admins can assign to technicians immediately.`
+      );
+    }
+
+    return newTasks;
+  };
+
+  // Immediate Admin Assignment to Technician
+  const assignTechnicianToRemedialTask = (
+    taskId: string,
+    technicianId: string,
+    scheduledDate: string,
+    timeWindow: string,
+    dispatchNotes?: string
+  ) => {
+    const tech = technicians.find(t => t.id === technicianId) || technicians[0];
+    const now = new Date().toISOString();
+
+    setRemedialTasks(prev =>
+      prev.map(task => {
+        if (task.id === taskId) {
+          return {
+            ...task,
+            status: 'assigned',
+            assignedTechnicianId: tech.id,
+            assignedTechnicianName: tech.name,
+            assignedTechnicianSaqcc: tech.saqccNumber,
+            assignedTechnicianPhone: tech.phone,
+            assignedTechnicianEmail: tech.email,
+            assignedAt: now,
+            assignedBy: currentUser?.name || 'Admin',
+            targetCompletionDate: scheduledDate,
+            targetTimeWindow: timeWindow,
+            dispatchNotes: dispatchNotes || task.dispatchNotes
+          };
+        }
+        return task;
+      })
+    );
+
+    // Update technician assigned count
+    setTechnicians(prev =>
+      prev.map(t => (t.id === tech.id ? { ...t, currentAssignedCount: t.currentAssignedCount + 1 } : t))
+    );
+
+    addAuditLog(
+      'ASSIGN_REMEDIAL_TASK',
+      'RemedialActionTask',
+      taskId,
+      `Assigned remedial task ${taskId} to technician ${tech.name} (${tech.saqccNumber}) for ${scheduledDate} (${timeWindow})`
+    );
+
+    // Dispatch push notification
+    sendPushAlert({
+      type: 'urgent_dispatch',
+      title: `Technician Dispatched: ${tech.name}`,
+      body: `Remedial task assigned for ${scheduledDate} (${timeWindow}). Work Order issued with SANS compliance requirements.`,
+      severity: 'high',
+      technicianName: tech.name
+    });
+
+    showToast(
+      'success',
+      'Technician Dispatched Immediately',
+      `Remedial action assigned to ${tech.name} (${tech.saqccNumber}) for ${scheduledDate}.`
+    );
+  };
+
+  // Batch Assign multiple Remedial Tasks to a Technician
+  const batchAssignRemedialTasks = (
+    taskIds: string[],
+    technicianId: string,
+    scheduledDate: string,
+    timeWindow: string,
+    dispatchNotes?: string
+  ) => {
+    const tech = technicians.find(t => t.id === technicianId) || technicians[0];
+    const now = new Date().toISOString();
+
+    setRemedialTasks(prev =>
+      prev.map(task => {
+        if (taskIds.includes(task.id)) {
+          return {
+            ...task,
+            status: 'assigned',
+            assignedTechnicianId: tech.id,
+            assignedTechnicianName: tech.name,
+            assignedTechnicianSaqcc: tech.saqccNumber,
+            assignedTechnicianPhone: tech.phone,
+            assignedTechnicianEmail: tech.email,
+            assignedAt: now,
+            assignedBy: currentUser?.name || 'Admin',
+            targetCompletionDate: scheduledDate,
+            targetTimeWindow: timeWindow,
+            dispatchNotes: dispatchNotes || task.dispatchNotes
+          };
+        }
+        return task;
+      })
+    );
+
+    setTechnicians(prev =>
+      prev.map(t => (t.id === tech.id ? { ...t, currentAssignedCount: t.currentAssignedCount + taskIds.length } : t))
+    );
+
+    showToast(
+      'success',
+      `${taskIds.length} Tasks Assigned to ${tech.name}`,
+      `Batch dispatch confirmed for ${scheduledDate} (${timeWindow}).`
+    );
+  };
+
+  // Update status (e.g. marked In Progress, Rectified, or Verified Closed)
+  const updateRemedialTaskStatus = (
+    taskId: string,
+    status: RemedialTaskStatus,
+    notes?: string,
+    retestPassed?: boolean
+  ) => {
+    const now = new Date().toISOString();
+    setRemedialTasks(prev =>
+      prev.map(task => {
+        if (task.id === taskId) {
+          const updated: RemedialActionTask = { ...task, status };
+          if (status === 'rectified') {
+            updated.rectifiedAt = now;
+            updated.rectifiedNotes = notes || 'Rectification completed and tested functional.';
+            updated.retestPassed = retestPassed !== undefined ? retestPassed : true;
+          } else if (status === 'verified_closed') {
+            updated.verifiedAt = now;
+            updated.verifiedBy = currentUser?.name || 'Admin Lead';
+          }
+          return updated;
+        }
+        return task;
+      })
+    );
+
+    showToast('info', 'Task Status Updated', `Remedial action marked as ${status.replace('_', ' ')}.`);
+  };
+
+  // Create manual remedial task
+  const createRemedialTask = (taskData: Partial<RemedialActionTask>): RemedialActionTask => {
+    const timestamp = Date.now();
+    const newTask: RemedialActionTask = {
+      id: `rem-${timestamp}`,
+      referenceCode: `REM-${Math.floor(100 + Math.random() * 900)}`,
+      title: taskData.title || 'SANS Corrective Action',
+      description: taskData.description || 'Statutory rectification required',
+      sansClause: taskData.sansClause || 'SANS 10139:2012 Clause 25.3',
+      category: taskData.category || 'General',
+      priority: taskData.priority || 'high',
+      status: taskData.status || 'pending_assignment',
+      siteId: taskData.siteId || 'site-01',
+      siteName: taskData.siteName || 'Commercial Facility',
+      clientOrganisation: taskData.clientOrganisation || 'Client Organisation',
+      failureReason: taskData.failureReason || 'Maintenance check defect identified',
+      measuredValue: taskData.measuredValue,
+      statutoryConsequence: taskData.statutoryConsequence || 'Must be rectified under SANS 10139 mandate.',
+      dateGenerated: new Date().toISOString(),
+      targetCompletionDate: taskData.targetCompletionDate || new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      slaHours: taskData.slaHours || 24,
+      slaDeadline: new Date(Date.now() + (taskData.slaHours || 24) * 3600 * 1000).toISOString(),
+      requiredSaqccLevel: taskData.requiredSaqccLevel || 'Level 3 - Servicing / Commissioner',
+      recommendedParts: taskData.recommendedParts || [],
+      estimatedHours: taskData.estimatedHours || 2.0,
+      estimatedCostZAR: taskData.estimatedCostZAR || 2500,
+      assignedBy: currentUser?.name || 'Admin'
+    };
+
+    setRemedialTasks(prev => [newTask, ...prev]);
+    showToast('success', 'Remedial Action Created', `Task ${newTask.referenceCode} registered.`);
+    return newTask;
+  };
+
+  // Export Work Order text file
+  const exportRemedialWorkOrder = (task: RemedialActionTask) => {
+    downloadRemedialWorkOrderFile(task);
+    showToast('success', 'Work Order Exported', `Downloaded work order for ${task.referenceCode}.`);
+  };
+
   // Browser Push Notification Actions & Watchdog
   const requestPushPermission = async (): Promise<PushPermissionStatus> => {
     const status = await requestBrowserNotificationPermission();
@@ -2572,6 +3070,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getSuggestedSlots,
         exportInspectionICal,
 
+        // SANS Remedial Actions Task List & Immediate Technician Assignment
+        remedialTasks,
+        isMaintenanceCheckModalOpen,
+        setIsMaintenanceCheckModalOpen,
+        preselectedSiteForMaintenance,
+        setPreselectedSiteForMaintenance,
+        isAssignRemedialModalOpen,
+        setIsAssignRemedialModalOpen,
+        selectedRemedialTaskForAssignment,
+        setSelectedRemedialTaskForAssignment,
+        generateRemedialTasksFromChecks,
+        assignTechnicianToRemedialTask,
+        batchAssignRemedialTasks,
+        updateRemedialTaskStatus,
+        createRemedialTask,
+        exportRemedialWorkOrder,
+
         // Browser Push Notifications & Background Alerts
         pushPermission,
         pushNotifications,
@@ -2627,7 +3142,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         toasts,
         showToast,
-        dismissToast
+        dismissToast,
+
+        // Fire Detection Devices & QR Labels
+        fireDetectionDevices,
+        selectedDeviceForLog,
+        setSelectedDeviceForLog,
+        isDeviceLogModalOpen,
+        setIsDeviceLogModalOpen,
+        isDeviceQRGeneratorModalOpen,
+        setIsDeviceQRGeneratorModalOpen,
+        qrGeneratorPreselectedSiteId,
+        qrGeneratorPreselectedDeviceId,
+        openDeviceMaintenanceLog,
+        closeDeviceMaintenanceLog,
+        openDeviceQRGenerator,
+        closeDeviceQRGenerator,
+        addDeviceMaintenanceLog,
+
+        // Global Theme (Light / Brand Navy Dark)
+        theme,
+        setTheme,
+        toggleTheme
       }}
     >
       {children}

@@ -26,7 +26,10 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: PushNotificationPreferences = {
   reportAndEvidenceAlerts: true,
   backgroundPollingIntervalMinutes: 0.5, // 30 seconds
   userRoleScope: 'all',
-  desktopStickyBanner: true
+  desktopStickyBanner: true,
+  deviceInspectionRemindersEnabled: true,
+  reminderLeadDays: [30, 14, 7, 0],
+  deviceTypeFilters: ['optical_smoke', 'heat_detector', 'multi_sensor', 'manual_call_point', 'sounder_beacon', 'battery_bank']
 };
 
 export const INITIAL_SIMULATION_SCENARIOS: PushNotificationSimulationScenario[] = [

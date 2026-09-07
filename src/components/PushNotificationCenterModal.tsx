@@ -22,7 +22,10 @@ import {
   RotateCw,
   Info,
   Layers,
-  Timer
+  Timer,
+  Wrench,
+  CalendarClock,
+  Cpu
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import {
@@ -54,7 +57,10 @@ export const PushNotificationCenterModal: React.FC = () => {
     updatePushPreferences,
     testSoundChime,
     setActiveView,
-    setSelectedRequestId
+    setSelectedRequestId,
+    fireDetectionDevices,
+    openDeviceMaintenanceLog,
+    showToast
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'simulation' | 'history' | 'preferences' | 'standards'>('simulation');
@@ -74,6 +80,81 @@ export const PushNotificationCenterModal: React.FC = () => {
   const [customTargetRole, setCustomTargetRole] = useState<NotificationTargetRole>('all');
   const [customSite, setCustomSite] = useState('Tshwane Logistics Park - Central Depot');
   const [isSendingCustom, setIsSendingCustom] = useState(false);
+
+  // Device Inspection Scan State
+  const [isScanningDevices, setIsScanningDevices] = useState(false);
+  const [scanResultSummary, setScanResultSummary] = useState<{
+    overdueCount: number;
+    upcomingCount: number;
+    scannedCount: number;
+  } | null>(null);
+
+  const handleScanDeviceInspectionDates = () => {
+    setIsScanningDevices(true);
+    try {
+      const now = new Date();
+      let overdue = 0;
+      let upcoming = 0;
+      const configuredLeads = pushPreferences.reminderLeadDays || [30, 14, 7, 0];
+
+      fireDetectionDevices.forEach(device => {
+        if (!device.nextSansDueDate) return;
+        const dueDate = new Date(device.nextSansDueDate);
+        const diffMs = dueDate.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) {
+          overdue++;
+          sendPushAlert({
+            title: `🚨 OVERDUE SANS 10139 INSPECTION: ${device.id}`,
+            body: `${device.deviceTypeLabel} (${device.subLocation}) at ${device.siteName} is ${Math.abs(diffDays)} days overdue for statutory inspection (Last serviced: ${device.lastServiceDate}).`,
+            type: 'maintenance_deadline',
+            severity: 'critical',
+            targetRole: 'technician',
+            siteName: device.siteName,
+            serviceRequestRef: `DEV-${device.id}`,
+            standardClause: 'SANS 10139:2012 Clause 25.3 / 25.4',
+            slaDeadline: 'Immediate Attendance Required',
+            actionLabel: 'Inspect Device Log',
+            actionUrl: 'customer-portal'
+          });
+        } else if (configuredLeads.some(lead => diffDays <= lead)) {
+          upcoming++;
+          const sev: PushNotificationSeverity = diffDays <= 7 ? 'high' : 'medium';
+          sendPushAlert({
+            title: `⏰ SANS 10139 Routine Inspection Due in ${diffDays}d: ${device.id}`,
+            body: `Scheduled periodic check due on ${device.nextSansDueDate} for ${device.deviceTypeLabel} at ${device.siteName}. Last serviced: ${device.lastServiceDate}.`,
+            type: 'maintenance_deadline',
+            severity: sev,
+            targetRole: 'client',
+            siteName: device.siteName,
+            serviceRequestRef: `DEV-${device.id}`,
+            standardClause: 'SANS 10139:2012 Clause 25.3',
+            slaDeadline: `${diffDays} days remaining`,
+            actionLabel: 'View Device Profile',
+            actionUrl: 'customer-portal'
+          });
+        }
+      });
+
+      setScanResultSummary({
+        overdueCount: overdue,
+        upcomingCount: upcoming,
+        scannedCount: fireDetectionDevices.length
+      });
+
+      showToast(
+        'success',
+        'Device Scan Complete',
+        `Scanned ${fireDetectionDevices.length} devices: ${overdue} overdue alerts, ${upcoming} upcoming reminders queued.`
+      );
+    } catch (err) {
+      console.error(err);
+      showToast('error', 'Scan Error', 'Unable to process device last-serviced schedules.');
+    } finally {
+      setIsScanningDevices(false);
+    }
+  };
 
   // Close on Escape key
   useEffect(() => {
@@ -897,6 +978,125 @@ export const PushNotificationCenterModal: React.FC = () => {
                       </div>
                     </div>
                   </label>
+                </div>
+              </div>
+
+              {/* SANS 10139 Device Last-Serviced Inspection Reminders Settings Panel */}
+              <div className="p-4 bg-slate-900/80 border border-blue-900/60 rounded-xl space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                      <CalendarClock className="w-4 h-4 text-amber-400" />
+                      <span>SANS 10139 Routine Inspection Reminders Settings</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Configure automated push notifications for upcoming inspections based on each device's last-serviced date.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={pushPreferences.deviceInspectionRemindersEnabled ?? true}
+                      onChange={(e) => updatePushPreferences({ deviceInspectionRemindersEnabled: e.target.checked })}
+                      className="w-4 h-4 text-[#CC0000] rounded-xs accent-[#CC0000] cursor-pointer"
+                    />
+                    <span className="text-xs font-bold text-white">Active</span>
+                  </label>
+                </div>
+
+                {/* Reminder Lead Times Configuration */}
+                <div className="space-y-2">
+                  <div className="text-[11px] font-semibold text-slate-300">
+                    Inspection Due Advance Warning Windows (Days Prior to Next SANS Due Date):
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { days: 30, label: '30 Days', desc: 'Advance Planning' },
+                      { days: 14, label: '14 Days', desc: 'Work Order Prep' },
+                      { days: 7, label: '7 Days', desc: 'Technician SLA' },
+                      { days: 0, label: 'Due Day (0d)', desc: 'Immediate Statutory' }
+                    ].map(({ days, label, desc }) => {
+                      const currentLeads = pushPreferences.reminderLeadDays || [30, 14, 7, 0];
+                      const isChecked = currentLeads.includes(days);
+                      return (
+                        <label
+                          key={days}
+                          className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                            isChecked
+                              ? 'bg-blue-950/40 border-blue-700 text-white'
+                              : 'bg-slate-900 border-slate-800 text-slate-400'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const newLeads = e.target.checked
+                                ? [...currentLeads, days]
+                                : currentLeads.filter(d => d !== days);
+                              updatePushPreferences({ reminderLeadDays: newLeads });
+                            }}
+                            className="mt-0.5 w-3.5 h-3.5 text-[#CC0000] accent-[#CC0000]"
+                          />
+                          <div>
+                            <div className="text-xs font-bold">{label}</div>
+                            <div className="text-[10px] text-slate-400">{desc}</div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Device Type Scope */}
+                <div className="space-y-2 pt-2 border-t border-slate-800">
+                  <div className="text-[11px] font-semibold text-slate-300">
+                    SANS 10139 Equipment Categories Monitored by Routine Watchdog:
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    {[
+                      { id: 'optical_smoke', label: 'Optical Smoke Detectors (12mo Rotation)' },
+                      { id: 'heat_detector', label: 'Heat Detectors (Annual Test)' },
+                      { id: 'manual_call_point', label: 'Manual Call Points (Quarterly Rotation)' },
+                      { id: 'sounder_beacon', label: 'Sounder/Strobes (dB(A) Verification)' },
+                      { id: 'battery_bank', label: 'SLA Batteries (12mo Float/3yr Horizon)' },
+                      { id: 'interfaces', label: 'HVAC/Gas Interfaces (Annual Trip Test)' }
+                    ].map((item) => (
+                      <div key={item.id} className="flex items-center gap-2 p-2 bg-slate-900/60 rounded-md border border-slate-800/80">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        <span className="text-[11px] text-slate-300">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Device Register Status & Scan Trigger */}
+                <div className="p-3 bg-slate-950/60 rounded-lg border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="space-y-0.5 text-left w-full sm:w-auto">
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Cpu className="w-3.5 h-3.5 text-[#FFB703]" />
+                      <span>Device Register Telemetry:</span>
+                      <span className="text-slate-400 font-normal">
+                        {fireDetectionDevices.length} Fire Asset Records Loaded
+                      </span>
+                    </div>
+                    {scanResultSummary && (
+                      <div className="text-[11px] font-mono flex items-center gap-3 pt-1">
+                        <span className="text-red-400 font-bold">{scanResultSummary.overdueCount} Overdue Alerts</span>
+                        <span className="text-amber-400 font-bold">{scanResultSummary.upcomingCount} Upcoming Reminders</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleScanDeviceInspectionDates}
+                    disabled={isScanningDevices}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-600 to-red-600 hover:from-amber-500 hover:to-red-500 text-white font-mono font-bold text-xs rounded-lg shadow-md transition-all flex items-center gap-2 cursor-pointer w-full sm:w-auto justify-center"
+                  >
+                    <RotateCw className={`w-3.5 h-3.5 ${isScanningDevices ? 'animate-spin' : ''}`} />
+                    <span>{isScanningDevices ? 'Scanning...' : 'Scan Devices & Trigger Reminders'}</span>
+                  </button>
                 </div>
               </div>
 

@@ -49,7 +49,11 @@ import { AwsArchitectureDiagram } from '../components/AwsArchitectureDiagram';
 import { GoogleCalendarZoomAdminHub } from '../components/GoogleCalendarZoomAdminHub';
 import { SafetyFileDashboard } from '../components/SafetyFileDashboard';
 import { ComplianceAuditLog } from '../components/ComplianceAuditLog';
-import { Bell } from 'lucide-react';
+import { RemedialActionDashboard } from '../components/RemedialActionDashboard';
+import { SiteComplianceMap } from '../components/SiteComplianceMap';
+import { DeviceRegisterAndLabelManager } from '../components/DeviceRegisterAndLabelManager';
+import { TechnicianSchedulingModule } from '../components/TechnicianSchedulingModule';
+import { Bell, MapPin, QrCode, CalendarRange } from 'lucide-react';
 
 export const AdminPortalView: React.FC = () => {
   const {
@@ -94,10 +98,15 @@ export const AdminPortalView: React.FC = () => {
     setPreselectedRequestIdForReport,
     // Technical Documents & CAD Vault
     technicalDocuments,
-    setIsPushCenterOpen
+    setIsPushCenterOpen,
+    // SANS Remedial Actions
+    remedialTasks,
+    // Device Register & QR Labels
+    fireDetectionDevices,
+    openDeviceQRGenerator
   } = useApp();
 
-  const [activeSection, setActiveSection] = useState<'requests' | 'reports' | 'safety_files' | 'calendar_zoom' | 'documents' | 'videos' | 'voice' | 'emails' | 'cms' | 'audit' | 'metrics' | 'aws_cloud'>('requests');
+  const [activeSection, setActiveSection] = useState<'remedials' | 'technician_scheduling' | 'site_map' | 'device_qr_codes' | 'requests' | 'reports' | 'safety_files' | 'calendar_zoom' | 'documents' | 'videos' | 'voice' | 'emails' | 'cms' | 'audit' | 'metrics' | 'aws_cloud'>('remedials');
   const [isAwsModalOpen, setIsAwsModalOpen] = useState(false);
   const [selectedReqId, setSelectedReqId] = useState<string | null>(serviceRequests[0]?.id || null);
 
@@ -291,6 +300,63 @@ export const AdminPortalView: React.FC = () => {
 
         <div className="flex items-center gap-2 border-b border-slate-200 pb-3 overflow-x-auto text-xs font-mono font-bold no-scrollbar">
           <button
+            id="admin-nav-remedials"
+            onClick={() => setActiveSection('remedials')}
+            className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'remedials'
+                ? 'bg-[#CC0000] text-white shadow-sm border-b-2 border-b-white'
+                : 'bg-red-50 text-red-950 hover:bg-red-100 border border-red-200'
+            }`}
+          >
+            <ShieldAlert className="w-4 h-4 text-[#CC0000]" />
+            <span>SANS Remedial Actions ({remedialTasks.length})</span>
+            {remedialTasks.filter(t => t.status === 'pending_assignment').length > 0 && (
+              <span className="bg-[#CC0000] text-white text-[10px] font-black px-1.5 py-0.2 rounded-full animate-pulse">
+                {remedialTasks.filter(t => t.status === 'pending_assignment').length}
+              </span>
+            )}
+          </button>
+
+          <button
+            id="admin-nav-technician-scheduling"
+            onClick={() => setActiveSection('technician_scheduling')}
+            className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'technician_scheduling'
+                ? 'bg-[#0A192F] text-white shadow-sm border-b-2 border-b-[#CC0000]'
+                : 'bg-amber-50 text-amber-950 hover:bg-amber-100 border border-amber-200'
+            }`}
+          >
+            <CalendarRange className="w-4 h-4 text-amber-600" />
+            <span>Technician Scheduling &amp; Weekly Capacity</span>
+          </button>
+
+          <button
+            id="admin-nav-site-map"
+            onClick={() => setActiveSection('site_map')}
+            className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'site_map'
+                ? 'bg-[#0A192F] text-white shadow-sm border-b-2 border-b-[#CC0000]'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <MapPin className="w-4 h-4 text-emerald-500" />
+            <span>Interactive Site Map (8 Sites)</span>
+          </button>
+
+          <button
+            id="admin-nav-device-qr-codes"
+            onClick={() => setActiveSection('device_qr_codes')}
+            className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
+              activeSection === 'device_qr_codes'
+                ? 'bg-[#CC0000] text-white shadow-sm border-b-2 border-b-white'
+                : 'bg-red-50 text-red-950 hover:bg-red-100 border border-red-200'
+            }`}
+          >
+            <QrCode className="w-4 h-4 text-[#CC0000]" />
+            <span>QR Device Labels &amp; Logbook ({fireDetectionDevices.length})</span>
+          </button>
+
+          <button
             onClick={() => setActiveSection('requests')}
             className={`px-4 py-2.5 rounded-sm transition-all flex items-center gap-2 cursor-pointer ${
               activeSection === 'requests'
@@ -438,6 +504,34 @@ export const AdminPortalView: React.FC = () => {
           </button>
         </div>
       </section>
+
+      {/* SECTION 0: SANS Remedial Actions & Immediate Technician Dispatch */}
+      {activeSection === 'remedials' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <RemedialActionDashboard />
+        </section>
+      )}
+
+      {/* SECTION 0.5: SANS 10139 Client Sites Interactive Map Visualization */}
+      {activeSection === 'site_map' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <SiteComplianceMap />
+        </section>
+      )}
+
+      {/* SECTION 0.6: SANS 10139 Printable QR Device Labels & Maintenance Logbook */}
+      {activeSection === 'device_qr_codes' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <DeviceRegisterAndLabelManager />
+        </section>
+      )}
+
+      {/* SECTION 0.7: SANS 10139 Technician Scheduling & Capacity Hub */}
+      {activeSection === 'technician_scheduling' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <TechnicianSchedulingModule />
+        </section>
+      )}
 
       {/* SECTION 1: Service Requests Management */}
       {activeSection === 'requests' && (

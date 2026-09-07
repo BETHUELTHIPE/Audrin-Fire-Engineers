@@ -40,8 +40,13 @@ import {
   Award,
   BookOpen,
   Presentation,
-  LogIn
+  LogIn,
+  BarChart3,
+  Radio,
+  PhoneCall,
+  Phone
 } from 'lucide-react';
+import { ServiceDueDashboard } from '../components/ServiceDueDashboard';
 import { ServiceRequest, RequestStatus, RequestAttachment, Appointment } from '../types';
 import { DocumentUploadZone } from '../components/DocumentUploadZone';
 import { DocumentEvidenceVault } from '../components/DocumentEvidenceVault';
@@ -74,9 +79,12 @@ import { SafetyFileEmailModal } from '../components/SafetyFileEmailModal';
 import { safetyFileService } from '../services/safetyFileService';
 import { SafetyFile } from '../types/safetyFile';
 import { LegalView } from './LegalView';
+import { EmergencyDispatchContactList } from '../components/EmergencyDispatchContactList';
+import { EmergencyDispatchModal } from '../components/EmergencyDispatchModal';
+import { EMERGENCY_ESCALATION_DESK } from '../data/emergencyDispatchData';
 
 export interface CustomerPortalViewProps {
-  initialSection?: 'requests' | 'safety_file' | 'compliance_tracker' | 'compliance_timeline' | 'statutory_forms' | 'compliance_calendar' | 'zoom_consultations' | 'appointments' | 'sans_legal_hub';
+  initialSection?: 'requests' | 'safety_file' | 'compliance_tracker' | 'compliance_timeline' | 'statutory_forms' | 'compliance_calendar' | 'service_due' | 'zoom_consultations' | 'appointments' | 'sans_legal_hub' | 'emergency_dispatch';
 }
 
 export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialSection = 'requests' }) => {
@@ -108,7 +116,8 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialS
     setPreselectedSiteForSchedule
   } = useApp();
 
-  const [activePortalSection, setActivePortalSection] = useState<'requests' | 'safety_file' | 'compliance_tracker' | 'compliance_timeline' | 'statutory_forms' | 'compliance_calendar' | 'zoom_consultations' | 'appointments' | 'sans_legal_hub'>(initialSection);
+  const [activePortalSection, setActivePortalSection] = useState<'requests' | 'safety_file' | 'compliance_tracker' | 'compliance_timeline' | 'statutory_forms' | 'compliance_calendar' | 'service_due' | 'zoom_consultations' | 'appointments' | 'sans_legal_hub' | 'emergency_dispatch'>(initialSection);
+  const [isEmergencyDispatchModalOpen, setIsEmergencyDispatchModalOpen] = useState(false);
 
   useEffect(() => {
     if (initialSection) {
@@ -495,11 +504,37 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialS
                 <FilePlus className="w-4 h-4" />
                 <span>New Request</span>
               </button>
+
+              <button
+                id="btn-hero-emergency-dispatch"
+                onClick={() => setIsEmergencyDispatchModalOpen(true)}
+                className="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 border border-red-500 text-white px-3.5 py-2.5 rounded-sm font-mono font-bold text-xs uppercase tracking-wider shadow-lg transition-all cursor-pointer animate-pulse"
+                title="Open 24/7 Emergency Dispatch Roster"
+              >
+                <PhoneCall className="w-4 h-4" />
+                <span>Emergency Dispatch</span>
+              </button>
             </div>
           </div>
 
           {/* Section Navigation Tabs */}
           <div className="flex items-center gap-3 mt-8 pt-6 border-t border-slate-700/80 overflow-x-auto no-scrollbar">
+            <button
+              id="btn-nav-emergency-dispatch"
+              onClick={() => setActivePortalSection('emergency_dispatch')}
+              className={`px-4 py-2.5 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activePortalSection === 'emergency_dispatch'
+                  ? 'bg-red-600 text-white shadow-lg ring-2 ring-red-400'
+                  : 'bg-red-500/20 text-red-200 hover:bg-red-500/30 hover:text-white border border-red-500/40'
+              }`}
+            >
+              <Radio className="w-4 h-4 text-red-400 animate-pulse" />
+              <span>Emergency Dispatch (On-Call)</span>
+              <span className="bg-red-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold ml-1">
+                24/7 Rapid
+              </span>
+            </button>
+
             <button
               onClick={() => setActivePortalSection('requests')}
               className={`px-4 py-2.5 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
@@ -589,6 +624,22 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialS
             </button>
 
             <button
+              id="btn-nav-service-due"
+              onClick={() => setActivePortalSection('service_due')}
+              className={`px-4 py-2.5 rounded-sm font-mono text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                activePortalSection === 'service_due'
+                  ? 'bg-[#CC0000] text-white shadow-md'
+                  : 'bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30 hover:text-white border border-emerald-400/30'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 text-emerald-400" />
+              <span>'Service Due' Horizons</span>
+              <span className="bg-emerald-400 text-slate-900 text-[10px] px-2 py-0.5 rounded-full font-bold ml-1">
+                SANS 10139
+              </span>
+            </button>
+
+            <button
               id="btn-nav-appointments"
               data-testid="btn-nav-zoom-consultations"
               onClick={() => setActivePortalSection('appointments')}
@@ -629,6 +680,53 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialS
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Push Alert Permission & SLA Watchdog Banner */}
         <PushNotificationPermissionBanner className="mb-6" />
+
+        {/* Quick-Access Emergency Dispatch Bar for Fire Safety Managers */}
+        <div id="quick-access-emergency-bar" className="mb-6 bg-slate-900 border-l-4 border-l-red-600 border border-slate-800 rounded-sm p-3.5 sm:p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-sm bg-red-600/20 border border-red-500/40 text-red-500 flex items-center justify-center shrink-0">
+              <PhoneCall className="w-5 h-5 animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-mono font-black text-white uppercase tracking-wider">
+                  Emergency Dispatch Hotline:
+                </span>
+                <span className="text-xs font-mono font-bold text-amber-300">
+                  {EMERGENCY_ESCALATION_DESK.hotlineDisplay}
+                </span>
+                <span className="bg-red-500/20 text-red-300 border border-red-500/40 text-[10px] font-mono px-2 py-0.5 rounded-xs font-bold uppercase">
+                  SANS 10139 24/7 SLA
+                </span>
+                <span className="text-[11px] font-mono text-slate-400">
+                  On-Call: <strong className="text-slate-200">Bethuel Moukangwe (Lead Diagnostics)</strong>
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-sans mt-0.5">
+                Immediate mobile response for fire alarm panels in uncontrollable alarm, loop drops, or life-safety impairment.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+            <a
+              id="btn-quick-call-primary"
+              href={`tel:${EMERGENCY_ESCALATION_DESK.hotlinePhone.replace(/\s+/g, '')}`}
+              className="flex-1 md:flex-initial px-3.5 py-2 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-mono font-bold text-xs uppercase tracking-wider rounded-xs flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            >
+              <Phone className="w-3.5 h-3.5" />
+              <span>Call Primary ({EMERGENCY_ESCALATION_DESK.hotlineDisplay})</span>
+            </a>
+            <button
+              id="btn-quick-open-dispatch"
+              onClick={() => setActivePortalSection('emergency_dispatch')}
+              className="flex-1 md:flex-initial px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-mono font-bold text-xs uppercase tracking-wider rounded-xs border border-slate-700 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+            >
+              <Radio className="w-3.5 h-3.5 text-red-400" />
+              <span>On-Call Roster</span>
+            </button>
+          </div>
+        </div>
 
         {activePortalSection === 'sans_legal_hub' ? (
           <div className="space-y-6">
@@ -763,6 +861,10 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialS
         ) : activePortalSection === 'compliance_calendar' ? (
           <div className="space-y-6">
             <ComplianceCalendar />
+          </div>
+        ) : activePortalSection === 'service_due' ? (
+          <div className="space-y-6">
+            <ServiceDueDashboard />
           </div>
         ) : activePortalSection === 'zoom_consultations' || activePortalSection === 'appointments' ? (
           <div className="space-y-6">
@@ -1007,6 +1109,12 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialS
                 </div>
               );
             })()}
+          </div>
+        ) : activePortalSection === 'emergency_dispatch' ? (
+          <div className="space-y-6">
+            <EmergencyDispatchContactList
+              onOpenServiceRequest={() => setIsRequestModalOpen(true)}
+            />
           </div>
         ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -2063,6 +2171,13 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({ initialS
           }}
         />
       )}
+
+      {/* Quick-Access Emergency Dispatch On-Call Modal */}
+      <EmergencyDispatchModal
+        isOpen={isEmergencyDispatchModalOpen}
+        onClose={() => setIsEmergencyDispatchModalOpen(false)}
+        onOpenServiceRequest={() => setIsRequestModalOpen(true)}
+      />
 
     </div>
   );

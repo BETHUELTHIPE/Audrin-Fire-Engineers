@@ -1448,6 +1448,10 @@ export interface PushNotificationPreferences {
   backgroundPollingIntervalMinutes: number; // 0.5 (30s), 1, 5, 15
   userRoleScope: NotificationTargetRole;
   desktopStickyBanner: boolean;
+  // SANS 10139 Routine Inspection Reminders based on device last-serviced dates
+  deviceInspectionRemindersEnabled?: boolean;
+  reminderLeadDays?: number[]; // e.g. [30, 14, 7, 0]
+  deviceTypeFilters?: string[]; // e.g. ['optical_smoke', 'heat_detector', 'battery_bank']
 }
 
 export interface PushNotificationSimulationScenario {
@@ -1901,4 +1905,6 @@ export interface IntegrationMetrics {
   failedSecretRetrievals: number;
   webhookProcessingFailures: number;
 }
+
+export * from './types/remedialActions';
 

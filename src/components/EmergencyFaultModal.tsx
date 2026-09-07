@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../context/AppContext';
 import { AlertTriangle, Phone, ShieldAlert, X, Send, CheckCircle2 } from 'lucide-react';
 import { COMPANY_DETAILS } from '../data/initialData';
@@ -19,8 +20,6 @@ export const EmergencyFaultModal: React.FC = () => {
   const [attachments, setAttachments] = useState<RequestAttachment[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRef, setSubmittedRef] = useState<string | null>(null);
-
-  if (!isEmergencyModalOpen) return null;
 
   const handleFilesAdded = (newAttachments: Omit<RequestAttachment, 'id' | 'uploadedAt'>[]) => {
     const newItems: RequestAttachment[] = newAttachments.map((item, idx) => ({
@@ -86,27 +85,41 @@ export const EmergencyFaultModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A192F]/85 backdrop-blur-md animate-in fade-in">
-      <div className="bg-white rounded-sm shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-gray-200">
-        
-        {/* Header */}
-        <div className="bg-[#CC0000] text-white px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-sm bg-black/20 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-white animate-pulse" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm uppercase tracking-wider text-white">Report a Fire-Alarm Fault</h3>
-              <p className="text-[11px] text-red-100 uppercase tracking-widest">High-Priority Diagnostic Dispatch</p>
-            </div>
-          </div>
-          <button
-            onClick={handleClose}
-            className="text-red-100 hover:text-white p-1 rounded-sm transition-colors cursor-pointer"
+    <AnimatePresence>
+      {isEmergencyModalOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0A192F]/85 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 420 }}
+            className="bg-white dark:bg-[#0A192F] rounded-sm shadow-2xl max-w-xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-gray-200 dark:border-slate-700"
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+            
+            {/* Header */}
+            <div className="bg-[#CC0000] text-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-black/20 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-white animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm uppercase tracking-wider text-white">Report a Fire-Alarm Fault</h3>
+                  <p className="text-[11px] text-red-100 uppercase tracking-widest">High-Priority Diagnostic Dispatch</p>
+                </div>
+              </div>
+              <button
+                onClick={handleClose}
+                className="text-red-100 hover:text-white p-1 rounded-sm transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
         {/* Life Safety Disclaimer */}
         <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-start gap-3 text-xs text-red-900">
@@ -290,7 +303,9 @@ export const EmergencyFaultModal: React.FC = () => {
           )}
         </div>
 
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

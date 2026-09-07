@@ -1,6 +1,48 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // 1. Preamble initialization for React Fast Refresh
+      window.$RefreshReg$ = window.$RefreshReg$ || function() {};
+      window.$RefreshSig$ = window.$RefreshSig$ || function() { return function(type) { return type; }; };
+      window.__vite_plugin_react_preamble_installed__ = true;
+
+      // 2. Filter benign Vite sandbox WebSocket connection/transport errors
+      (function() {
+        var isBenignViteError = function(err) {
+          if (!err) return false;
+          var msg = typeof err === 'string' ? err : (err.message || String(err));
+          return (
+            msg.indexOf("reading 'send'") !== -1 ||
+            msg.indexOf("failed to connect to websocket") !== -1 ||
+            msg.indexOf("can't detect preamble") !== -1 ||
+            msg.indexOf("WebSocket closed without opened") !== -1
+          );
+        };
+
+        var originalConsoleError = console.error;
+        console.error = function() {
+          for (var i = 0; i < arguments.length; i++) {
+            if (isBenignViteError(arguments[i])) return;
+          }
+          return originalConsoleError.apply(console, arguments);
+        };
+
+        window.addEventListener('error', function(e) {
+          if (isBenignViteError(e.message) || isBenignViteError(e.error)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(e) {
+          if (isBenignViteError(e.reason)) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+          }
+        }, true);
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
     <meta name="theme-color" content="#0A192F" />
