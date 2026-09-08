@@ -1,60 +1,121 @@
-name: Build and Push Docker Image to Docker Hub
+name: Validate and Publish Docker Image
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_IMAGE: bethuelm/audrin-fire-engineers
+
 jobs:
-  build-and-push:
-    name: Build & Push Docker Hub Container
+  validate:
+    name: Validate application
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - name: Set up QEMU (Multi-platform support)
-        uses: docker/setup-qemu-action@v3
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run TypeScript checks
+        run: bun run lint
+
+      - name: Build production application
+        run: bun run build
+
+  publish:
+    name: Publish multi-platform image
+    needs: validate
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Verify Docker Hub token is configured
+        env:
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
+        run: |
+          test -n "$DOCKERHUB_TOKEN" || { echo "Missing DOCKERHUB_TOKEN or DOCKER_PASSWORD repository secret"; exit 1; }
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME || 'bethuelm' }}
           password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract Docker metadata
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
-          images: bethuelm/audrin-fire-engineers
+          images: ${{ env.DOCKER_IMAGE }}
           tags: |
-            type=raw,value=latest
-            type=sha,format=short
-            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short,prefix=sha-
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=Audrin Fire Engineers
+            org.opencontainers.image.description=Fire detection and compliance management platform
+            org.opencontainers.image.vendor=Audrin Fire Engineers (Pty) Ltd
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        id: push
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          pull: true
+          provenance: mode=max
+          sbom: true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@master
+      - name: Scan published image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
         continue-on-error: true
         with:
-          image-ref: bethuelm/audrin-fire-engineers:latest
-          format: 'table'
+          image-ref: ${{ env.DOCKER_IMAGE }}:latest
+          format: table
           exit-code: '0'
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      - name: Publish workflow summary
+        run: |
+          echo "### Docker image published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Image: \`${DOCKER_IMAGE}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Digest: \`${{ steps.push.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Platforms: \`linux/amd64\`, \`linux/arm64\`" >> "$GITHUB_STEP_SUMMARY"
