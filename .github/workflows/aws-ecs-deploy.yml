@@ -32,20 +32,19 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: 'npm'
+          bun-version: latest
 
-      - name: Install Frontend Dependencies
-        run: npm ci
+      - name: Install Locked Frontend Dependencies
+        run: bun install --frozen-lockfile
 
       - name: Run TypeScript Verification & Lint
-        run: npm run lint
+        run: bun run lint
 
       - name: Build Production Bundle Test
-        run: npm run build
+        run: bun run build
 
   build-and-push-images:
     name: 2. Build & Push Docker Container to Docker Hub & AWS ECR
@@ -109,16 +108,15 @@ jobs:
       - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: 20
-          cache: 'npm'
+          bun-version: latest
 
       - name: Install & Compile Static Files
         run: |
-          npm ci
-          npm run build
+          bun install --frozen-lockfile
+          bun run build
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
